@@ -1,0 +1,16 @@
+<article>
+	<header>
+		<h1>{{ .Title }}</h1>
+		{{ with .Params.subtitle }}
+		<span class="post__subtitle">
+			{{.}}
+		</span>
+		{{ end }}
+		{{ partial "page-single/post-meta.html" . }}
+	</header>
+	<hr/>
+	<div class="post">
+		{{ .TableOfContents }}
+		{{ .Content }}
+	</div>
+</article>

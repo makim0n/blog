@@ -1,0 +1,18 @@
+{{ if .Site.Params.highlightjs }}
+    {{ if or (not (isset .Params "highlight")) (.Params.highlight) }}
+        {{ $hl := newScratch }}
+        {{ $hl.Set "languages" (union (.Site.Params.highlightjslanguages) (.Params.highlightjslanguages)) }}
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js" integrity="sha256-/BfiIkHlHoVihZdc6TFuj7MmJ0TWcWsMXkeDFwhi0zw= sha384-ZeLYJ2PNSQjvogWP559CDAf02Qb8FE5OyQicqtz/+UhZutbrwyr87Be7NPH/RgyC sha512-ExaEi+x+Zqq50MIBraxsK23lQQJZd8Q7ZDlwJsxQwsWlO8XvRouQev9ZWaFxCKdTvrgb2fmf2pglwGp61/7qZA==" crossorigin="anonymous"></script>
+	{{ with $hl.Get "languages" }}
+            {{ range . }}
+                <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/{{.}}.min.js"></script>
+            {{ end }}
+            
+        {{ end }}
+        <script type="text/javascript">
+            hljs.configure({languages: []});
+            hljs.initHighlightingOnLoad();
+        </script>
+        {{ $hl.Delete "languages" }}
+    {{ end }}    
+{{ end }}

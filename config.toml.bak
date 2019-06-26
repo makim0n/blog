@@ -1,0 +1,80 @@
+## Global configuration
+baseURL = "https://maki.bzh/"
+title = "Just another infosec blog"
+description = "Personal blog to share knowlegde, experience and stupid things."
+pluralizeListTitles = false
+defaultContentLanguage = "en"
+defaultContentLanguageInSubdir = true
+enableRobotsTXT = true
+
+## Site Settings
+[params]
+    author = "Maki"
+    authorimage = "img/maki.jpg"
+    dateformat = "Jan 2, 2006"
+    highlightjs = true
+    highlightjsstyle = "solarized-dark"
+
+## Social Accounts
+[params.social]
+   aperikube = "aperikube"
+   email = "Yml0ZWRlcG91bGV0"
+   #github = "ACKNAK-Tools"
+   gitlab = "maki_chaz"
+   rootme = "Maki-37744"
+   hackthebox = "10265"
+   twitter = "maki_chaz"
+
+## Handling EN/FR Languages
+[Languages]
+   ## English
+   [Languages.en]
+      ## Main Menu
+      [[Languages.en.menu.main]]
+         name = "Articles"
+         identifier = "articles"
+         weight = 1
+         url = "/en/articles/"
+      [[Languages.en.menu.main]]
+         name = "Challenges"
+         identifier = "challenges"
+         weight = 2
+         url = "/en/challenges/"
+      [[Languages.en.menu.main]]
+         name = "Walkthrough"
+         identifier = "walkthrough"
+         weight = 3
+         url = "/en/walkthrough/"
+      [[Languages.en.menu.main]]
+         name = "About"
+         identifier = "about"
+         weight = 5
+         url = "/en/about/"
+      [[Languages.en.menu.main]]
+         name = "Friends"
+         identifier = "friends"
+         weight = 4
+         url = "/en/friends"
+   ## French
+   [Languages.fr]
+      ## Main Menu
+      [[Languages.fr.menu.main]]
+         name = "Articles"
+         identifier = "articles"
+         weight = 1
+         url = "/fr/articles/"
+      [[Languages.fr.menu.main]]
+         name = "Challenges"
+         identifier = "challenges"
+         weight = 2
+         url = "/fr/challenges/"
+      [[Languages.fr.menu.main]]
+         name = "Walkthrough"
+         identifier = "walkthrough"
+         weight = 3
+         url = "/fr/walkthrough/"
+      [[Languages.fr.menu.main]]
+         name = "A propos"
+         identifier = "about"
+         weight = 5
+         url = "/fr/about/"

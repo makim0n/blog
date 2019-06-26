@@ -1,0 +1,27 @@
+{{ define "header" }}
+	{{ partial "page-single/variables-init.html" . }}
+	{{ partial "header.html" . }}
+{{ end }}
+
+{{ define "content" }}
+	{{ partial "page-single/content.html" . }}
+{{ end }}
+
+{{ define "footer" }}
+	{{ partial "page-single/footer.html" . }}
+	{{ partial "page-single/variables-deinit.html" . }}
+	<script>
+    (function() {
+      var toc = document.getElementById('TableOfContents');
+      if (!toc) return;
+      do {
+        var li, ul = toc.querySelector('ul');
+        if (ul.childElementCount !== 1) break;
+        li = ul.firstElementChild;
+        if (li.tagName !== 'LI') break;
+        // remove <ul><li></li></ul> where only <ul> only contains one <li>
+        ul.outerHTML = li.innerHTML;
+      } while (toc.childElementCount >= 1);
+    })();
+  </script>
+{{ end }}

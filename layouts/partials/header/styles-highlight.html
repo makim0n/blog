@@ -1,0 +1,10 @@
+	{{ if .Site.Params.highlightjs }}
+	{{ if or (not (isset .Params "highlight")) (.Params.highlight) }}
+	<!-- highlightjs -->
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/solarized-dark.min.css" integrity="sha256-90Y+fvi28WF+3jKH4tHEkoQ9WLeFKJjpvCPNOtU9ZvU= sha384-s+7l2WBKs5ChgZ+esoTV0aWZRcma7BxuSHlzBJz6PH4Cc4ZX3/ErQZtk+ZzYQy/X sha512-BiC3DH0qMCjCYqPNGAthQ95QCndm60uhfQVwhqZ2eG1zuGkP+3T1cw6PzEC4CiRfRIbd2qvyN39RoDfil/XcMA==" crossorigin="anonymous">
+	{{ end }}
+	{{ end }}
+	{{ if .Site.Params.PygmentsUseClasses }}
+	<!-- Pygments Syntax -->
+	+<link rel="stylesheet" href="{{ "/css/syntax.min.css" | relURL }}" integrity="sha256-FiH5xHHF/VoOg7bc9UubA6CGYq3hxHQDPGVTEQVAVlE=" crossorigin="anonymous">
+	{{ end }}

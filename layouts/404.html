@@ -1,0 +1,13 @@
+{{ define "header" }}
+	{{ partial "header.html" . }}
+{{ end }}
+
+{{ define "content" }}
+<h1>Not found</h1>
+<p class="lead">Looks like this page doesn't exist <b>¯\_(ツ)_/¯</b>.</br>
+<marquee>L33t H4ck3rs are always looking for flags, here is yours ..|..</marquee></br>
+Meh kidding, come back <a href="{{ .Site.BaseURL }}">home</a> mate :)</p>
+{{ end }}
+
+{{ define "footer" }}
+{{ end }}

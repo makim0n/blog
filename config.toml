@@ -1,0 +1,63 @@
+## Global configuration
+baseURL = "https://maki.bzh/"
+title = "Just another infosec blog"
+description = "Personal blog to share knowlegde, experience and stupid things."
+pluralizeListTitles = false
+#defaultContentLanguage = "en"
+defaultContentLanguageInSubdir = true
+enableRobotsTXT = true
+
+## Site Settings
+[params]
+    author = "Maki"
+    authorimage = "img/maki.jpg"
+    dateformat = "Jan 2, 2006"
+    highlightjs = true
+    highlightjsstyle = "solarized-dark"
+    toc = "hugo"
+
+## Social Accounts
+[params.social]
+   aperikube = "aperikube"
+   email = "Yml0ZWRlcG91bGV0"
+   #github = "ACKNAK-Tools"
+   gitlab = "maki_chaz"
+   rootme = "Maki-37744"
+   hackthebox = "10265"
+   twitter = "maki_chaz"
+
+## Handling EN/FR Languages
+[Languages]
+   ## English
+   [Languages.en]
+      ## Main Menu
+      [[Languages.en.menu.main]]
+         name = "Articles"
+         identifier = "articles"
+         weight = 1
+         url = "/articles/"
+      [[Languages.en.menu.main]]
+         name = "CTF"
+         identifier = "ctf"
+         weight = 4
+         url = "/ctf/"
+      [[Languages.en.menu.main]]
+         name = "Walkthrough"
+         identifier = "walkthrough"
+         weight = 2
+         url = "/walkthrough/"
+      [[Languages.en.menu.main]]
+         name = "Who am I?"
+         identifier = "whoami"
+         weight = 6
+         url = "/whoami/"
+      [[Languages.en.menu.main]]
+         name = "Friends"
+         identifier = "friends"
+         weight = 5
+         url = "/friends/"
+      [[Languages.en.menu.main]]
+	 name = "Stupid things"
+	 identifier = "stupidthings"
+         weight = 3
+	 url = "/stupidthings/"
