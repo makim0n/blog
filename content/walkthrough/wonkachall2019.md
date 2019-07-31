@@ -1131,6 +1131,9 @@ Pour des soucis de lisibilité, la sortie de Mimikatz a été tronquée. Les ide
 5. __ired.team__, _Credential Access & Dumping_, ired.team : https://ired.team/offensive-security/credential-access-and-credential-dumping
 6. __Mark Russinovich and Andrew Richards__, _ProcDump v9.0_,  Documentation Microsoft : https://docs.microsoft.com/en-us/sysinternals/downloads/procdump
 
+---
+---
+
 ## VII. Step 7 - Spreading love
 
 >  Sharing is caring ;) 
@@ -1139,7 +1142,7 @@ Pour des soucis de lisibilité, la sortie de Mimikatz a été tronquée. Les ide
 
 1. Essayer d'accéder aux partages du réseau avec identifiants récupérés ;
 2. Trouver le partage __Users__ sur le serveur `172.16.42.5` ;
-3. Le parcourir et trouver les identifiants : `factory.lan\SvcJoinComputerToDom : QueStC3qU!esTpetItEtMarr0N?`
+3. Le parcourir et trouver les identifiants : `factory.lan\SvcJoinComputerToDom : QueStC3qU!esTpetItEtMarr0N?`.
 
 ---
 
@@ -1209,38 +1212,7 @@ Administrator
         └── flag-07.txt
 ```
 
-### VII.3. Flag
-
-> 5FFECA75938FA8E5D7FCB436451DA1BC4713DCD94DD6F57F2DF50E035039AB0C
-
----
-
-### Resources
-
-1. __ShawnDEvans__, _SMBmap_, GitHub : https://github.com/ShawnDEvans/smbmap
-2. __Mickael Dorigny__, _Monter un partage CIFS sous Linux_, it-connect : https://www.it-connect.fr/monter-un-partage-cifs-sous-linux/
-
-## VIII. Step 8 - Wagging the dogs
-
->  SHA256(NTLM(krbtgt)) 
-
-### TL;DR
-
-1. Connecter une machine au Domaine (j'ai pris une commando VM)
-2. Faire un `bloodhound` de l'active directory
-3. Grâce à la note de l'étape précédente et les comptes qu'on a, on se doute que c'est du `resources based constrained delegation`
-4. Ajouter une machine au domaine avec un `SPN` connu
-5. Modifier la valeur de `msDS-AllowedToActOnBehalfOfOtherIdentity` de cet utilisateur
-6. Utiliser `S4U2User` et `S4U2Proxy` avec Rubeus pour impersonate Administrator sur le Domain Controller
-7. Rubeus forge un ticket, il suffit de faire un `psexec` sur le DC avec l'utilisateur impersonate (Administrator)
-8. Récupérer le `ntds.dit` grâce à l'outil `vssadmin`
-9. récupérer le hash de `krbtgt`
-
----
-
-### VIII.1. State of the art
-
-Cette étape a été pour moi la plus compliquée du challenge, j'y ai passé vraiment plusieurs heures dessus. Pour réussir correctement cette étape il faut partir de la note récupéré dans l'épreuve précédente :
+Le fichier __credentials.txt__ à côté du flag sera utile pour la suite, car il contient de nouveaux identifiants :
 
 ```bash
 #####
@@ -1256,50 +1228,106 @@ factory.lan\SvcJoinComputerToDom
 QueStC3qU!esTpetItEtMarr0N?
 ```
 
-Il faut prendre en compte toutes les informations. La note ci-dessus parle de `delegate`, donc probablement une histoire de délégation, dans un AD il y a plusieurs type de délégation, le blog de Pixis en parle très bien :
+### VII.3. Flag
 
-* Fonctionnement de la délégation kerberos : https://beta.hackndo.com/constrained-unconstrained-delegation/
-* Resources based constrained delegation : https://beta.hackndo.com/resource-based-constrained-delegation-attack/
-* Unconstrained delegation : https://beta.hackndo.com/unconstrained-delegation-attack/
+> 5FFECA75938FA8E5D7FCB436451DA1BC4713DCD94DD6F57F2DF50E035039AB0C
 
-#### VIII.1.a. Connection to Active Directory
+---
 
-Maintenant qu'on a un compte pouvant se connecter au domaine, j'ai décidé d'ajouter ma Commando VM à l'active directory. Pour ça, j'ai mis ma VM en NAT et je me suis connecté au VPN avec mon hôte, comme ça même les redémarrages de la VM ne vont pas être dérangeant pour se connecter à l'AD.
+### Resources
 
-Pour les DNS de Commando VM j'ai mis :
+1. __ShawnDEvans__, _SMBmap_, GitHub : https://github.com/ShawnDEvans/smbmap
+2. __Mickael Dorigny__, _Monter un partage CIFS sous Linux_, it-connect : https://www.it-connect.fr/monter-un-partage-cifs-sous-linux/
 
-* 172.16.42.5 : adresse de l'active directory, pour utiliser son DNS
-* 192.168.143.1 : adresse de mon hôte pour taper dessus si besoin
+---
+---
 
+## VIII. Step 8 - Wagging the dogs
+
+>  SHA256(NTLM(krbtgt)) 
+
+### TL;DR
+
+1. Faire un `bloodhound` avec le compte __adminServer__ ;
+2. Remarquer la relation __AddAllowedToAct__ entre _DC01-WW2.FACTORY.LAN_ et _SvcJoinComputerToDom_ ;
+3. Entre la note précédente et la relation trouvée, comprendre qu'il faut abuser du __resources based constrained delegation__ ;
+4. Ajout de la CommandoVM dans le domaine grâce au compte de service (_SvcJoinComputerToDom_) ;
+5. Créer un SPN et modifier sa valeur de `msDS-AllowedToActOnBehalfOfOtherIdentity` ;
+6. Abuser du mécanisme __S4U__ (_S4U2User_ et _S4U2Proxy_) avec Rubeus pour impersonate l'administrateur de domaine ;
+7. Lorsque Rubeus a forgé le ticket de l'administrateur, il est possible d'utiliser __psexec__ sur le contrôleur de domaine ;
+8. Extraire le `ntds.dit` en utilisant `vssadmin` sur le contrôleur de domaine ;
+9. Copier le fichier généré sur une de nos machines et utiliser __secretdumps.py__ afin de récupérer les différents hash, dont celui de `krbtgt`.
+
+---
+
+### VIII.1. Reconnaissance
+
+Tout d'abord, cette étape est sûrement la plus difficile du challenge. À ce stade, il y a deux comptes de disponibles : un compte utilisateur du domaine (_adminServer_) et un compte de service (_SvcJoinComputerToDom_).
+
+La première idée est de faire un bloodhound avec le compte utilisateur du domaine. __Bloodhound__ est un outil de cartographie d'Active Directory. Il permet de visualiser le domaine sous forme de graphe et de voir les différentes relations entre les objets du domaine (utilisateurs, machines, groupes ...). De plus, il permet de distinguer les faiblesses du domaine et donne des informations pratiques pour les exploiter.
+
+_Note_ : Le dépôt GitHub est souvent mis à jour, embarquant de nouvelles fonctionnalités, ne pas oublier de récupérer la dernière version avant de partir en test interne.
+
+_BloodHound_ permet de visualiser la données, mais le collecteur s'appelle __SharpHound__. Il se situe dans le même dépôt dans le dossier "Ingestors". Avant de l'utiliser, il faut ajouter l'adresse IP du contrôleur de domaine en tant que serveur DNS principal, afin d'accéder au domaine :
+
+<center>
 ![](/img/writeups/wonkachall2019/step8_dns.png)
-_Fig 21_ : DNS IP
+_Fig 23_ : Adresse IP du serveur DNS (DC)
+</center>
 
-Pour connecter la VM à l'AD, il suffit de le faire avec les utilitaires graphiques de Windows 10 : `Se connecter à réseau scolaire ou professionnel`, avec les identifiants du compte `SvcJoinComputerToDom`.
+_Note_ : Comme présenté dans le schéma situé dans l'introduction, CommandoVM est en NAT. La seconde IP correspond à l'IP de mon hôte sur l'interface virtuelle.
 
+#### VIII.1.a BloodHound
+
+Lorsque cette étape est réalisée, _CommandoVM_ est en mesure de ping le domaine `factory.lan`. _SharpHound_ peut être executé à l'aide de la commande suivante :
+
+```bash
+(CommandVM) ➜ .\SharpHound.exe --Domain factory.lan --DomainController 172.16.42.5 --LDAPUser adminServer --LDAPPass '#3LLe!!estOuL@Poulette' --CollectionMethod All,GPOLocalGroup,LoggedOn
+```
+
+Le fichier zip contenant les informations sera créé dans le dossier courant. En visualisant les données récupérées, deux éléments sont intéressants :
+
+- Il n'y a qu'un seul et unique administrateur de domaine __Administrator__ ;
+- Une relation __AddAllowedToAct__ est présente entre le contrôleur de domaine (_DC01-WW2.FACTORY.LAN_) et le compte (_SvcJoinComputerToDom_).
+
+Cette relation est mentionnée sur le blog de _CptJesus_. Le blogpost montre l'introduction de nouvelles primitives d'attaques : AddAllowedToAct/AllowedToAct. Ces primitives sont utilisées pour identifier l'attaque __Resource Based Constrained Delegation__ (RBCD).
+
+#### VIII.1.b Resource Based Constrained Delegation - Explication
+
+Pour reprendre ce qu'a dit __Pixis__ sur son blog au sujet de cette attaque (cf. Ressource 4 : _Resource-Based Constrained Delegation - Risques_) : 
+
+> Contrairement à la délégation complète, la délégation Resource-Based est un poil plus compliquée. L’idée générale est que ce sont les ressources de fin de chaine qui décident si oui ou non un service peut s’authentifier auprès d’elles en tant qu’un autre utilisateur. Ces ressources ont donc une liste de comptes en lesquels elles ont confiance. Si une ressource fait confiance au compte WEBSERVER$, alors quand un utilisateur s’authentifiera auprès de WEBSERVER$, il pourra lui même s’authentifier auprès de cette ressource en tant que l’utilisateur.
+
+La ressource finale, s'occupant de l'authentification, a une "whitelist". Cette liste contient tous les comptes de confiance et est stocké dans un attribut appelé `msDS-AllowedToActOnBehalfOfOtherIdentity`. Toujours en paraphrasant l'article de __Pixis__, dans le cas où un utilisateur s'authentifie sans utiliser Kerberos, alors le compte de service qui est censé "impersonate" l'utilisateur n'aura pas de TGS. Cest à ce moment que le compte de service fera une demande de TGS au nom de l'utilisateur désirant se connecter au KDC. Ce mécanisme s'appelle le __S4U2Self__. Lorsque que le TGS de l'utilisateur est correctement reçu, il peut alors accéder à la ressource grâce au mécanisme __S4U2Proxy__.
+
+Cependant, si un compte machine fait la demande d'un TGS sans l'attribut `TrustedToAuthForDelegation`, alors le TGS reçu sera _non transférable_. Malgré tout, lors de la demande de TGS pour une ressource via __S4U2Proxy__, cette demande sera validée. J'invite toutes les personnes intéressées par ce genre d'attaque à lire les articles de __Pixis__ sur _hackndo.com_, __SpecterOps__, __harmj0y__ et  __shenaniganslabs__. Les différents liens sont disponibles dans les ressources.
+
+Ayant tout ceci en tête, l'article de _CptJesus_ semble plus clair. Ce même article mentionne deux conditions pour réussir ce genre d'attaque : 
+
+1. Pouvoir réécrire l'attribut `msds-AllowedToActOnBehalfOfOtherIdentity`, contenant les comptes de confiance ;
+2. Contrôler un utilisateur avec un __ServicePrincipalName__ (SPN) mis en place.
+
+Cette attaque va permettre d'accéder au contrôleur de domaine en tant qu'administrateur de domaine. 
+
+Enfin, ces prérequis sont rempli dans notre cas. La relation que BloodHound a trouvé entre _DC01-WW2.FACTORY.LAN_ et _SvcJoinComputerToDom_ permet de réécrire l'attribut `msds-AllowedToActOnBehalfOfOtherIdentity`. Quant au contrôle d'un utilisateur ayant un SPN configuré, il faudrait ajouter une machine au domaine. En se basant sur la note __credentials.txt__, on sait que le compte _SvcJoinComputerToDom_ à cette fonction.
+
+### VIII.2. Exploitation
+
+La reconnaissance étant terminée, le moment est venu d'exploiter cette vulnérabilité. Tout d'abord, il convient d'ajouter notre CommandoVM au domaine grâce au compte _SvcJoinComputerToDom_ :
+
+<center>
 ![](/img/writeups/wonkachall2019/step8_connect2dom.png)
-_Fig 22_ : Connection to domain
+_Fig 24_ : Connexion de CommandoVM au domaine FACTORY.LAN
+</center>
 
-En type de compte, j'ai mis `Administrateur`, ça fait de `SvcJoinComputerToDom` un administrateur local. On en aura besoin plus tard. Pour s'assurer que notre compte est bien relié au domaine, il nous suffit de lister les utilisateurs avec `net user /dom` :
+_Note_ : Lorsque que l'ajout de la machine a été validée par le domaine, notre Windows demande quel type de compte devra être _SvcJoinComputerToDom_. Pour être sûre de pas être embêté, je l'ai mis administrateur local.
 
+Afun de s'assurer que CommandoVM est correctement relié au domaine, il suffit de lister les utilisateurs du domaine à l'aide de la commande suivante : `net user /dom`
+
+<center>
 ![](/img/writeups/wonkachall2019/step8_domainuser.png)
-_Fig 23_ : Test if the machine is in the domain
-
-#### VIII.1.b. Bloodhound
-
-Bloodhound est un outil de mapping Active Directory, je vais le lancer histoire de voir un peu les différentes relations entre les entités (machines, utilisateurs...) et essayer de récupérer des éléments sur les délégations. Voici la liste des domain admin :
-
-![](/img/writeups/wonkachall2019/step8_domainadmin.png)
-_Fig 24_ : Domain admin account
-
-Le but va être d'impersonate l'utilisateur `Administrator`.
-
-Le Bloodhound est disponible ici : https://mega.nz/#!2rwTFK4I!YMUyIKpmGUvH4uqr2DSjyGCpqEBEFqz8zG09NMJLgxg
-
-#### VIII.1.c. Which type of delegation ?
-
-Avec les éléments récupérés, on a un compte pouvant ajouter une machine à un domaine, donc on s'affranchi de la phase du man in the middle ipv6 expliqué dans l'article de Pixis. En sachant ça, on peut ajouter une machine au domaine, créer et ajouter un SPN au domaine. On peut donc dire que ça ressemble à la `Resource Based Constrained Delegation`.
-
-Alors si j'ai bien compris cette histoire de resources based constrained delegation, il faut que j'ajoute une machine au domaine, une machine où je suis administrateur local. Ensuite, créer un compte SPN et l'ajouter au domaine. Une fois qu'on a une machine et un compte SPN, grâce à l'utilisateur `SvcJoinComputerToDom`, il faut modifier la variable `msds-allowedtoactonbehalfofotheridentity` pour que la ressource finale soit "de confiance". Une fois que tous ça est en place, il faut faire une requête `S4U2Self` pour récupérer un TGS non transférable et utiliser `S4U2Proxy` pour quand même accéder à la ressource voulu en tant que n'importe quel utilisateur, soit l'accès au DC en tant qu'Administrator.
+_Fig 25_ : Liste des utilisateurs du domaine
+</center>
 
 ### VIII.2. Resource Based Constrained Delegation
 
@@ -1432,8 +1460,10 @@ Enfin ! Il ne reste plus qu'à faire le sha256 du hash de krbtgt pour flag !
 
 ### Resources
 
-1. __PenTestPartners__, _Bloodhound walkthrough. A Tool for Many Tradecrafts_, Blog de PenTestPartners : https://www.pentestpartners.com/security-blog/bloodhound-walkthrough-a-tool-for-many-tradecrafts/
-1. __Pixis__, _Resource-Based Constrained Delegation - Risques_, hackndo : https://beta.hackndo.com/resource-based-constrained-delegation-attack/
+1. __Pixis__, _BloodHound_, hackndo : https://beta.hackndo.com/bloodhound/
+2. __Rohan Vazarkar__, _BloodHound 2.1: The Fix Broken Stuff Update_, cptjesus.com : https://blog.cptjesus.com/posts/bloodhound21
+3. __PenTestPartners__, _Bloodhound walkthrough. A Tool for Many Tradecrafts_, Blog de PenTestPartners : https://www.pentestpartners.com/security-blog/bloodhound-walkthrough-a-tool-for-many-tradecrafts/
+4. __Pixis__, _Resource-Based Constrained Delegation - Risques_, hackndo : https://beta.hackndo.com/resource-based-constrained-delegation-attack/
 2. __harmj0y__, _A Case Study in Wagging the Dog: Computer Takeover_, Blog de harmj0y : https://www.harmj0y.net/blog/activedirectory/a-case-study-in-wagging-the-dog-computer-takeover/
 3. __Elad Shamir__, _Wagging the Dog: Abusing Resource-Based Constrained Delegation to Attack Active Directory_, Blog de shenaniganslabs : https://shenaniganslabs.io/2019/01/28/Wagging-the-Dog.html
 4. __Dirk-jan Mollema__, _“Relaying” Kerberos - Having fun with unconstrained delegation_, Blog de Dirk-jan Mollema : https://dirkjanm.io/krbrelayx-unconstrained-delegation-abuse-toolkit/
