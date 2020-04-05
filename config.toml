@@ -1,5 +1,5 @@
 ## Global configuration
-baseURL = "https://maki.bzh/"
+baseURL = "https://www.maki.bzh/"
 title = "Just another infosec blog"
 description = "Personal blog to share knowlegde, experience and stupid things."
 pluralizeListTitles = false
